@@ -17,6 +17,7 @@ export function getPermissions(role: AppRole): Permissions {
       canEditQa: true,
       canViewOwnQa: false,
       canManageUsers: true,
+      canManageSettings: true,
       canViewAudit: true,
       canViewAllSensei: true,
       canExportEomReport: true
@@ -39,6 +40,7 @@ export function getPermissions(role: AppRole): Permissions {
       canEditQa: true,
       canViewOwnQa: false,
       canManageUsers: false,
+      canManageSettings: true,
       canViewAudit: true,
       canViewAllSensei: true,
       canExportEomReport: false
@@ -60,6 +62,7 @@ export function getPermissions(role: AppRole): Permissions {
     canEditQa: false,
     canViewOwnQa: true,
     canManageUsers: false,
+    canManageSettings: false,
     canViewAudit: false,
     canViewAllSensei: false,
     canExportEomReport: false

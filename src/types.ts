@@ -289,6 +289,8 @@ export interface Permissions {
   canEditQa: boolean;
   canViewOwnQa: boolean;
   canManageUsers: boolean;
+  /** Super Admin + Kyouiku: change operational settings (Pengaturan), incl. the weekly hour target. Never Sensei. */
+  canManageSettings: boolean;
   canViewAudit: boolean;
   canViewAllSensei: boolean;
   /** Super Admin/Ops: export all Sensei EOM. Sensei: view own only (no export). */

@@ -148,7 +148,8 @@ export const NAV_BY_ROLE: Record<AppRole, TabId[]> = {
     'qa',
     'disciplinary',
     'reports',
-    'audit'
+    'audit',
+    'settings'
   ],
   Sensei: [
     'overview',
