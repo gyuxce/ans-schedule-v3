@@ -34,7 +34,7 @@ const KIND_LABEL: Record<ActionItem['kind'], string> = {
   late_join: 'Clock-in terlambat',
   schedule_conflict: 'Konflik jadwal',
   unassigned_sensei: 'Sensei tanpa kelas',
-  hours_below_target: 'Di bawah 16 jam',
+  hours_below_target: 'Di bawah target jam',
   low_availability: 'Ketersediaan rendah',
   ending_soon: 'Ending soon',
   overdue_class: 'Kelas overdue'
@@ -74,6 +74,7 @@ export function OverviewView() {
   const enrollments = useDashboardStore((state) => state.enrollments);
   const allStudents = useDashboardStore((state) => state.students);
   const weekAnchor = useDashboardStore((state) => state.weekAnchor);
+  const weeklyHourTarget = useDashboardStore((state) => state.settings.weeklyHourTarget);
   const setWeekAnchor = useDashboardStore((state) => state.setWeekAnchor);
   const setTab = useDashboardStore((state) => state.setTab);
   const clockIn = useDashboardStore((state) => state.clockIn);
@@ -104,7 +105,8 @@ export function OverviewView() {
     classMasters,
     enrollments,
     students: allStudents,
-    weekAnchor
+    weekAnchor,
+    weeklyHourTarget
   });
 
   const groups = useMemo(() => groupActionItems(items), [items]);

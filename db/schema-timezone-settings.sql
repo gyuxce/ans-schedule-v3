@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 
 INSERT INTO app_settings (key, value)
-VALUES ('late_grace_minutes', '0'::jsonb)
+VALUES ('late_grace_minutes', '0'::jsonb), ('weekly_hour_target', '10'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
