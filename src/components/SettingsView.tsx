@@ -10,10 +10,15 @@ export function SettingsView() {
   const updateSettings = useDashboardStore((state) => state.updateSettings);
   const { theme, setTheme } = useTheme();
   const [grace, setGrace] = useState(String(settings.lateGraceMinutes));
+  const [hourTarget, setHourTarget] = useState(String(settings.weeklyHourTarget));
 
   useEffect(() => {
     setGrace(String(settings.lateGraceMinutes));
   }, [settings.lateGraceMinutes]);
+
+  useEffect(() => {
+    setHourTarget(String(settings.weeklyHourTarget));
+  }, [settings.weeklyHourTarget]);
 
   if (!permissions.canManageUsers && permissions.role !== 'Super Admin') {
     return <p className="text-sm text-ink-soft">Hanya Super Admin yang dapat mengubah pengaturan.</p>;
@@ -72,6 +77,38 @@ export function SettingsView() {
           </Button>
         </div>
         <p className="text-xs text-ink-soft">Nilai aktif sekarang: {settings.lateGraceMinutes} menit</p>
+      </section>
+
+      <section className="ui-card space-y-3 p-5">
+        <div>
+          <p className="ui-label">Target jam mengajar / minggu</p>
+          <p className="mt-1 text-xs text-ink-soft">
+            Dasar hitung beban kerja Sensei — bar &ldquo;X / Y jam&rdquo; di menu Sensei, filter
+            &ldquo;Di bawah target jam&rdquo;, dan peringatan under-utilized di Action Center. Berlaku untuk
+            semua Sensei.
+          </p>
+        </div>
+        <input
+          className="ui-input max-w-[140px]"
+          type="number"
+          min={1}
+          max={80}
+          step={1}
+          value={hourTarget}
+          onChange={(event) => setHourTarget(event.target.value)}
+        />
+        <div>
+          <Button
+            onClick={() => {
+              const parsed = Number(hourTarget);
+              if (!Number.isFinite(parsed) || parsed < 1) return;
+              updateSettings({ weeklyHourTarget: Math.floor(parsed) });
+            }}
+          >
+            Simpan target
+          </Button>
+        </div>
+        <p className="text-xs text-ink-soft">Nilai aktif sekarang: {settings.weeklyHourTarget} jam / minggu</p>
       </section>
     </div>
   );

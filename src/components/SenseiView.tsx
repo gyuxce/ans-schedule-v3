@@ -52,6 +52,7 @@ export function SenseiView() {
   const setSenseiLeave = useDashboardStore((state) => state.setSenseiLeave);
   const createUserLogin = useDashboardStore((state) => state.createUserLogin);
   const currentUser = useDashboardStore((state) => state.currentUser);
+  const weeklyHourTarget = useDashboardStore((state) => state.settings.weeklyHourTarget);
   const visible = permissions.canViewAllSensei
     ? sensei
     : sensei.filter((item) => item.id === currentUser?.senseiId);
@@ -180,7 +181,7 @@ export function SenseiView() {
   const roster = useMemo(() => {
     const rows = visible.map((item) => {
       const labels = getOperationalLabels(item, schedules, leavePeriods, new Date(), classMasters);
-      const workload = getWorkloadMetrics(item.id, availability, schedules, weekAnchor);
+      const workload = getWorkloadMetrics(item.id, availability, schedules, weekAnchor, weeklyHourTarget);
       const linked = users.some(
         (user) => user.email.trim().toLowerCase() === item.email.trim().toLowerCase()
       );
@@ -199,7 +200,17 @@ export function SenseiView() {
       if (aScore !== bScore) return aScore - bScore;
       return senseiDisplayName(a.item).localeCompare(senseiDisplayName(b.item));
     });
-  }, [visible, schedules, leavePeriods, classMasters, availability, weekAnchor, users, filter]);
+  }, [
+    visible,
+    schedules,
+    leavePeriods,
+    classMasters,
+    availability,
+    weekAnchor,
+    weeklyHourTarget,
+    users,
+    filter
+  ]);
 
   const groups = useMemo(() => {
     if (filter !== 'all') return [{ key: 'flat', label: '', rows: roster }];
@@ -259,7 +270,7 @@ export function SenseiView() {
               getOperationalLabels(item, schedules, leavePeriods, new Date(), classMasters).includes('NEW')
             ).length
           },
-          { id: 'below_target', label: 'Di bawah 16 jam' }
+          { id: 'below_target', label: `Di bawah ${weeklyHourTarget} jam` }
         ]}
       />
       <div className="ui-card overflow-hidden">

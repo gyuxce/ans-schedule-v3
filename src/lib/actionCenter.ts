@@ -38,10 +38,13 @@ export function buildActionItems(input: {
   enrollments?: Enrollment[];
   students?: Student[];
   weekAnchor: Date | string;
+  weeklyHourTarget?: number;
   now?: Date;
 }): ActionItem[] {
   const items: ActionItem[] = [];
   const now = input.now ?? new Date();
+  const weeklyHourTarget =
+    input.weeklyHourTarget && input.weeklyHourTarget > 0 ? input.weeklyHourTarget : WEEKLY_HOUR_TARGET;
   const todayKey = toDateKey(now);
   const lookbackStart = toDateKey(addDays(now, -SESSION_ALERT_LOOKBACK_DAYS));
   const weekEnd = toDateKey(weekDays(input.weekAnchor)[6]);
@@ -164,19 +167,25 @@ export function buildActionItems(input: {
       });
     }
 
-    const workload = getWorkloadMetrics(sensei.id, input.availability, input.schedules, input.weekAnchor);
+    const workload = getWorkloadMetrics(
+      sensei.id,
+      input.availability,
+      input.schedules,
+      input.weekAnchor,
+      weeklyHourTarget
+    );
     if (sensei.primaryStatus === 'ACTIVE' && !labels.includes('CUTI')) {
-      if (workload.assignedHours < WEEKLY_HOUR_TARGET) {
+      if (workload.assignedHours < weeklyHourTarget) {
         items.push({
           id: `hours:${sensei.id}`,
           kind: 'hours_below_target',
           severity: workload.assignedHours === 0 ? 'high' : 'low',
-          title: `${sensei.name} di bawah target 16 jam`,
-          detail: `${workload.assignedHours}/${WEEKLY_HOUR_TARGET} jam terisi · sisa kapasitas ${Math.max(workload.remainingHours, 0)} jam`,
+          title: `${sensei.name} di bawah target ${weeklyHourTarget} jam`,
+          detail: `${workload.assignedHours}/${weeklyHourTarget} jam terisi · sisa kapasitas ${Math.max(workload.remainingHours, 0)} jam`,
           senseiId: sensei.id
         });
       }
-      if (workload.availableHours > 0 && workload.availableHours < WEEKLY_HOUR_TARGET) {
+      if (workload.availableHours > 0 && workload.availableHours < weeklyHourTarget) {
         items.push({
           id: `low_avail:${sensei.id}`,
           kind: 'low_availability',

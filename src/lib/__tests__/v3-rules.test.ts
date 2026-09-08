@@ -99,7 +99,7 @@ describe('Sensei labels', () => {
 });
 
 describe('workload', () => {
-  it('calculates available, assigned, remaining, utilization, and 16h gap', () => {
+  it('calculates available, assigned, remaining, utilization, and gap to the default target', () => {
     const metrics = getWorkloadMetrics(
       's1',
       [
@@ -129,7 +129,9 @@ describe('workload', () => {
     expect(metrics.assignedHours).toBe(2);
     expect(metrics.remainingHours).toBe(10);
     expect(metrics.utilization).toBeCloseTo(2 / 12);
-    expect(metrics.targetGap).toBe(14);
+    // default weekly target is 10h; explicit target overrides it
+    expect(metrics.targetGap).toBe(8);
+    expect(getWorkloadMetrics('s1', [], [], '2026-08-14', 20).targetGap).toBe(20);
   });
 
   it('builds day capacity from weekly slots and official sessions', () => {

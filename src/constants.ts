@@ -1,6 +1,7 @@
 import type { AppRole, AttendanceStatus, ClassType, EnrollmentStatus, PaymentStatus, TabId } from './types';
 
-export const WEEKLY_HOUR_TARGET = 16;
+/** Fallback weekly teaching-hour target when no value is set in Pengaturan. */
+export const WEEKLY_HOUR_TARGET = 10;
 
 export const CLASS_TYPES: ClassType[] = [
   'Private',
