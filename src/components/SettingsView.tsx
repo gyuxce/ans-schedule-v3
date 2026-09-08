@@ -20,8 +20,12 @@ export function SettingsView() {
     setHourTarget(String(settings.weeklyHourTarget));
   }, [settings.weeklyHourTarget]);
 
-  if (!permissions.canManageUsers && permissions.role !== 'Super Admin') {
-    return <p className="text-sm text-ink-soft">Hanya Super Admin yang dapat mengubah pengaturan.</p>;
+  if (!permissions.canManageSettings) {
+    return (
+      <p className="text-sm text-ink-soft">
+        Hanya Super Admin dan Kyouiku yang dapat mengubah pengaturan.
+      </p>
+    );
   }
 
   return (

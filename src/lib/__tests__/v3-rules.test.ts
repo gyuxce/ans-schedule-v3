@@ -67,6 +67,10 @@ describe('RBAC', () => {
     expect(getPermissions('Super Admin').canExportEomReport).toBe(true);
     expect(getPermissions('Kyouiku').canExportEomReport).toBe(false);
     expect(getPermissions('Sensei').canExportEomReport).toBe(false);
+    // Pengaturan (incl. weekly hour target): Super Admin + Kyouiku, never Sensei
+    expect(getPermissions('Super Admin').canManageSettings).toBe(true);
+    expect(getPermissions('Kyouiku').canManageSettings).toBe(true);
+    expect(getPermissions('Sensei').canManageSettings).toBe(false);
   });
 });
 
