@@ -44,12 +44,18 @@ export function AvailabilityView() {
     }
     setForm((current) => ({
       ...current,
-      senseiId: permissions.canOverrideAvailability ? current.senseiId || allSensei[0]?.id || '' : ownSenseiId
+      senseiId: permissions.canOverrideAvailability
+        ? current.senseiId || allSensei.find((item) => item.primaryStatus === 'ACTIVE')?.id || ''
+        : ownSenseiId
     }));
     setOpen(true);
   };
 
-  const visibleSensei = permissions.canViewAllSensei ? allSensei : sensei;
+  // Ops roster: only ACTIVE Sensei (matches Jadwal Resmi / Class Master / Disiplin).
+  // A Sensei viewing their own scope still sees their row even if INACTIVE.
+  const visibleSensei = permissions.canViewAllSensei
+    ? allSensei.filter((item) => item.primaryStatus === 'ACTIVE')
+    : sensei;
   const days = weekDays(weekAnchor);
 
   const openForDay = (senseiId: string, dateKey: string, weekday: number) => {
@@ -163,11 +169,13 @@ export function AvailabilityView() {
                 value={form.senseiId}
                 onChange={(event) => setForm({ ...form, senseiId: event.target.value })}
               >
-                {allSensei.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
+                {allSensei
+                  .filter((item) => item.primaryStatus === 'ACTIVE')
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
               </select>
             </label>
           ) : (
