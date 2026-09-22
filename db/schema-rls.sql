@@ -265,6 +265,14 @@ CREATE POLICY v3_schedules_update_ops
   ON schedules FOR UPDATE TO authenticated
   USING ((SELECT public.is_ops())) WITH CHECK ((SELECT public.is_ops()));
 
+-- A Sensei must be able to update their own session (submitSessionReport
+-- flips status -> 'completed'). Additive: Postgres OR's permissive UPDATE
+-- policies together, so v3_schedules_update_ops above still applies.
+CREATE POLICY v3_schedules_update_own
+  ON schedules FOR UPDATE TO authenticated
+  USING ((SELECT public.is_ops()) OR sensei_id = (SELECT public.current_sensei_id()))
+  WITH CHECK ((SELECT public.is_ops()) OR sensei_id = (SELECT public.current_sensei_id()));
+
 CREATE POLICY v3_schedules_delete_ops
   ON schedules FOR DELETE TO authenticated
   USING ((SELECT public.is_ops()));

@@ -287,6 +287,27 @@ export async function upsertScheduleRemote(session: ClassSession) {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * True UPDATE (not upsert) for a schedule that is known to already exist.
+ * Sensei are allowed to UPDATE their own schedule row (RLS: v3_schedules_update_own)
+ * but not INSERT one — `.upsert()` evaluates the INSERT policy too (Postgres runs
+ * ON CONFLICT DO UPDATE through the INSERT check), so it 403s for a Sensei even
+ * when the row already exists. Use this for Sensei-reachable status flips
+ * (e.g. submitSessionReport marking their own session 'completed').
+ */
+export async function updateScheduleStatusRemote(
+  scheduleId: string,
+  patch: { status: ClassSession['status']; updatedBy?: string }
+) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('schedules')
+    .update({ status: patch.status, updated_at: new Date().toISOString(), updated_by: patch.updatedBy })
+    .eq('id', scheduleId);
+  if (error) throw new Error(error.message);
+}
+
 export async function upsertAvailabilityRemote(slot: AvailabilitySlot) {
   const supabase = getSupabase();
   if (!supabase) return;

@@ -23,6 +23,7 @@ import {
   upsertLevelCompletionRemote,
   upsertQaRemote,
   upsertScheduleRemote,
+  updateScheduleStatusRemote,
   upsertSenseiStatusRemote,
   upsertSenseiTimezoneRemote,
   upsertSenseiRemote,
@@ -906,7 +907,12 @@ export const useDashboardStore = create<DashboardStore>()(
           savedReport = report;
           const schedules = current.schedules.map((item) => {
             if (item.id === scheduleId && item.status === 'active') {
-              completedSession = { ...item, status: 'completed' as const };
+              completedSession = {
+                ...item,
+                status: 'completed' as const,
+                updatedAt: new Date().toISOString(),
+                updatedBy: state.currentUser?.name
+              };
               return completedSession;
             }
             return item;
@@ -921,7 +927,12 @@ export const useDashboardStore = create<DashboardStore>()(
         if (savedReport) {
           void safeRemote(async () => {
             await upsertSessionReportRemote(savedReport!);
-            if (completedSession) await upsertScheduleRemote(completedSession);
+            if (completedSession) {
+              await updateScheduleStatusRemote(completedSession.id, {
+                status: 'completed',
+                updatedBy: completedSession.updatedBy
+              });
+            }
           }, 'Simpan laporan');
         }
         toast.success('Laporan sesi tersimpan per siswa');
