@@ -14,6 +14,7 @@ import { FilterChips } from './ui/FilterChips';
 import { Meter } from './ui/Meter';
 import { Modal } from './ui/Modal';
 import { PageIntro } from './ui/PageIntro';
+import { StudentPicker } from './ui/StudentPicker';
 
 type ClassFilter = 'all' | 'attention' | 'on_track' | 'idle' | 'done';
 
@@ -603,20 +604,11 @@ export function ClassesView() {
 
               <label>
                 <span className="ui-label">Siswa</span>
-                <select
-                  multiple
-                  className="ui-select h-28"
+                <StudentPicker
+                  students={allStudents}
                   value={form.studentIds}
-                  onChange={(e) =>
-                    setForm({ ...form, studentIds: Array.from(e.target.selectedOptions).map((o) => o.value) })
-                  }
-                >
-                  {allStudents.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(studentIds) => setForm({ ...form, studentIds })}
+                />
                 {form.type === 'Semi-Private' ? (
                   <p className="mt-1 text-xs text-ink-soft">Semi-Private: sistem mengharapkan 2–4 siswa.</p>
                 ) : null}
