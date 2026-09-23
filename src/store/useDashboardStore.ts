@@ -36,6 +36,7 @@ import {
   deleteSenseiRemote,
   deleteStudentRemote,
   deleteClassMasterRemote,
+  deleteEnrollmentRemote,
   writeAudit
 } from '../services/supabaseData';
 import { ensureClassEnrollments, progressEnrollmentJourney } from '../lib/enrollment';
@@ -1757,14 +1758,22 @@ export const useDashboardStore = create<DashboardStore>()(
         }
         const existing = state.classMasters.find((item) => item.id === classId);
         if (!existing) return false;
-        const blockers: string[] = [];
-        if (state.schedules.some((x) => x.classId === classId)) blockers.push('jadwal (termasuk yang dibatalkan)');
-        if (state.enrollments.some((x) => x.classId === classId)) blockers.push('enrollment siswa');
-        if (blockers.length) {
-          toast.error(`Tidak bisa hapus — masih ada ${blockers.join(', ')}. Set Cancelled/Draft saja.`);
+        if (state.schedules.some((x) => x.classId === classId)) {
+          toast.error('Tidak bisa hapus — masih ada jadwal (termasuk yang dibatalkan). Set Cancelled/Draft saja.');
+          return false;
+        }
+        // No schedule ever existed for this class, so any linked enrollment cannot
+        // have real session history — unless someone hand-typed a sessionsCompleted
+        // count. Cascade those pristine enrollments instead of blocking on them,
+        // since upsertClassMaster always auto-creates one via ensureClassEnrollments.
+        const linkedEnrollments = state.enrollments.filter((x) => x.classId === classId);
+        const withProgress = linkedEnrollments.filter((x) => (x.sessionsCompleted ?? 0) > 0);
+        if (withProgress.length) {
+          toast.error('Tidak bisa hapus — ada enrollment siswa yang sudah punya progress sesi. Set Cancelled/Draft saja.');
           return false;
         }
         try {
+          for (const enrollment of linkedEnrollments) await deleteEnrollmentRemote(enrollment.id);
           await deleteClassMasterRemote(classId);
         } catch (error) {
           toast.error(error instanceof Error ? error.message : 'Gagal menghapus Class Master');
@@ -1776,10 +1785,11 @@ export const useDashboardStore = create<DashboardStore>()(
             entity: 'class_masters',
             recordId: classId,
             oldValue: { displayName: existing.displayName, level: existing.level },
-            reason: 'Class Master dihapus dari dashboard (belum ada jadwal/enrollment terkait)'
+            reason: 'Class Master dihapus dari dashboard (belum ada jadwal; enrollment tanpa progress ikut dihapus)'
           });
           return {
             classMasters: current.classMasters.filter((item) => item.id !== classId),
+            enrollments: current.enrollments.filter((item) => item.classId !== classId),
             auditLogs: current.auditLogs
           };
         });
