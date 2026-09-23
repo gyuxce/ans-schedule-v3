@@ -502,3 +502,10 @@ export async function upsertEnrollmentRemote(enrollment: Enrollment) {
   const { error } = await supabase.from('enrollments').upsert(enrollmentToRow(enrollment));
   if (error) throw new Error(error.message);
 }
+
+export async function deleteEnrollmentRemote(enrollmentId: string) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase.from('enrollments').delete().eq('id', enrollmentId);
+  if (error) throw new Error(error.message);
+}

@@ -741,9 +741,9 @@ export function ClassesView() {
               {editing ? (
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-line p-3">
                   <span className="text-xs text-ink-soft">
-                    Hapus permanen — hanya untuk Class Master yang salah input (belum ada jadwal / enrollment).
-                    Kalau sudah ada jadwal atau sudah dipakai siswa, set status ke <b>Cancelled</b> atau{' '}
-                    <b>Draft</b> saja.
+                    Hapus permanen — hanya untuk Class Master yang salah input (belum pernah ada jadwal).
+                    Enrollment siswa yang belum punya progress ikut terhapus otomatis. Kalau sudah ada jadwal
+                    atau siswa sudah punya progress sesi, set status ke <b>Cancelled</b> atau <b>Draft</b> saja.
                   </span>
                   <ConfirmDelete
                     label="Hapus Class Master"
