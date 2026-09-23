@@ -778,7 +778,30 @@ export function ScheduleView() {
                         .filter(Boolean)
                         .join(', ') || '—',
                     full: true
-                  }
+                  },
+                  ...(editing.originalSenseiId
+                    ? [
+                        {
+                          label: 'Riwayat swap',
+                          value: `${displayName(allSensei, editing.originalSenseiId)} → ${displayName(allSensei, editing.senseiId)}${editing.swapInitiator ? ` · inisiatif ${editing.swapInitiator}` : ''}`,
+                          full: true
+                        },
+                        {
+                          label: 'Alasan swap',
+                          value: editing.swapReason || '—',
+                          full: true
+                        }
+                      ]
+                    : []),
+                  ...(editing.status === 'cancelled'
+                    ? [
+                        {
+                          label: 'Alasan pembatalan',
+                          value: `${editing.cancellationReason || '—'}${editing.cancellationInitiator ? ` · inisiatif ${editing.cancellationInitiator}` : ''}`,
+                          full: true
+                        }
+                      ]
+                    : [])
                 ]}
               />
               {permissions.canEditOfficialSchedule && editing.classId ? (
