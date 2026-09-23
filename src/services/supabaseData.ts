@@ -236,6 +236,15 @@ export async function deleteStudentRemote(studentId: string) {
   if (error) throw new Error(error.message);
 }
 
+export async function deleteClassMasterRemote(classId: string) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  // schedules.class_id / enrollments.class_id are guarded in the store — this only
+  // runs once neither table has any row left pointing at this class.
+  const { error } = await supabase.from('class_masters').delete().eq('id', classId);
+  if (error) throw new Error(error.message);
+}
+
 export async function ensureProfile(userId: string, email: string) {
   const supabase = getSupabase();
   if (!supabase) return null;

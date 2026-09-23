@@ -9,6 +9,7 @@ import type { ClassMaster, ClassMasterStatus, ClassType } from '../types';
 import { Avatar } from './ui/Avatar';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
+import { ConfirmDelete } from './ui/ConfirmDelete';
 import { DetailFields } from './ui/DetailFields';
 import { FilterChips } from './ui/FilterChips';
 import { Meter } from './ui/Meter';
@@ -87,6 +88,7 @@ export function ClassesView() {
   const sessionReports = useDashboardStore((state) => state.sessionReports);
   const upsertClassMaster = useDashboardStore((state) => state.upsertClassMaster);
   const generateClassSchedule = useDashboardStore((state) => state.generateClassSchedule);
+  const deleteClassMaster = useDashboardStore((state) => state.deleteClassMaster);
   const { classMasters } = useScopedData();
   const [editing, setEditing] = useState<ClassMaster | null>(null);
   const [creating, setCreating] = useState(false);
@@ -733,6 +735,28 @@ export function ClassesView() {
                   >
                     Generate {form.requiredMeetings} sesi
                   </Button>
+                </div>
+              ) : null}
+
+              {editing ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-line p-3">
+                  <span className="text-xs text-ink-soft">
+                    Hapus permanen — hanya untuk Class Master yang salah input (belum ada jadwal / enrollment).
+                    Kalau sudah ada jadwal atau sudah dipakai siswa, set status ke <b>Cancelled</b> atau{' '}
+                    <b>Draft</b> saja.
+                  </span>
+                  <ConfirmDelete
+                    label="Hapus Class Master"
+                    confirmLabel="Hapus Class Master"
+                    message={`Hapus ${editing.displayName}?`}
+                    onConfirm={async () => {
+                      const ok = await deleteClassMaster(editing.id);
+                      if (ok) {
+                        setEditing(null);
+                        setCreating(false);
+                      }
+                    }}
+                  />
                 </div>
               ) : null}
             </>

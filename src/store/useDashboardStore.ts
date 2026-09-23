@@ -35,6 +35,7 @@ import {
   deleteProfileRemote,
   deleteSenseiRemote,
   deleteStudentRemote,
+  deleteClassMasterRemote,
   writeAudit
 } from '../services/supabaseData';
 import { ensureClassEnrollments, progressEnrollmentJourney } from '../lib/enrollment';
@@ -220,6 +221,7 @@ interface DashboardStore extends DashboardSnapshot {
   deleteUser: (userId: string) => Promise<boolean>;
   deleteSensei: (senseiId: string) => Promise<boolean>;
   deleteStudent: (studentId: string) => Promise<boolean>;
+  deleteClassMaster: (classId: string) => Promise<boolean>;
 }
 
 function actor(state: DashboardStore) {
@@ -1745,6 +1747,43 @@ export const useDashboardStore = create<DashboardStore>()(
           };
         });
         toast.success('Siswa dihapus');
+        return true;
+      },
+      deleteClassMaster: async (classId) => {
+        const state = get();
+        if (state.currentUser?.role !== 'Super Admin') {
+          toast.error('Hanya Super Admin yang bisa menghapus Class Master');
+          return false;
+        }
+        const existing = state.classMasters.find((item) => item.id === classId);
+        if (!existing) return false;
+        const blockers: string[] = [];
+        if (state.schedules.some((x) => x.classId === classId)) blockers.push('jadwal (termasuk yang dibatalkan)');
+        if (state.enrollments.some((x) => x.classId === classId)) blockers.push('enrollment siswa');
+        if (blockers.length) {
+          toast.error(`Tidak bisa hapus — masih ada ${blockers.join(', ')}. Set Cancelled/Draft saja.`);
+          return false;
+        }
+        try {
+          await deleteClassMasterRemote(classId);
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Gagal menghapus Class Master');
+          return false;
+        }
+        set((current) => {
+          pushAudit(current, {
+            action: 'delete_class_master',
+            entity: 'class_masters',
+            recordId: classId,
+            oldValue: { displayName: existing.displayName, level: existing.level },
+            reason: 'Class Master dihapus dari dashboard (belum ada jadwal/enrollment terkait)'
+          });
+          return {
+            classMasters: current.classMasters.filter((item) => item.id !== classId),
+            auditLogs: current.auditLogs
+          };
+        });
+        toast.success('Class Master dihapus');
         return true;
       }
     }),
