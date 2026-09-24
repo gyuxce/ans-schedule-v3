@@ -138,6 +138,9 @@ export function ClassesView() {
     [form.startDate, weekdays, form.requiredMeetings]
   );
 
+  const editingCalendarCount = editing ? getClassProgress(editing, schedules, []).calendarCount : 0;
+  const editingFullyGenerated = editing != null && editingCalendarCount >= form.requiredMeetings && editingCalendarCount > 0;
+
   const save = () => {
     const id = upsertClassMaster({
       id: editing?.id,
@@ -659,12 +662,22 @@ export function ClassesView() {
                 />
               </label>
 
-              {editing ? (
+              {editing && editingFullyGenerated ? (
+                <div className="flex items-center gap-2 rounded-xl border border-ok/25 bg-ok-soft p-3">
+                  <span className="text-ok">✓</span>
+                  <p className="text-xs text-ink-soft">
+                    Jadwal sudah lengkap — <b className="text-ink">{editingCalendarCount}/{form.requiredMeetings} sesi</b> sudah
+                    ada di kalender. Tidak perlu generate lagi. Kalau mau ubah pola hari/jam, batalkan dulu sesi yang
+                    belum terjadi lewat Jadwal Resmi sebelum generate ulang.
+                  </p>
+                </div>
+              ) : editing || creating ? (
                 <div className="space-y-3 rounded-xl border border-info/25 bg-info-soft p-3">
                   <p className="font-semibold text-ink">Generate jadwal berulang</p>
                   <p className="text-xs text-ink-soft">
-                    Membuat {form.requiredMeetings} sesi kalender dari start date + hari dipilih.
-                    Cancel/makeup tidak mengubah target required meetings.
+                    {creating
+                      ? 'Opsional — isi ini sekalian kalau mau langsung bikin jadwal kalendernya juga, atau lewati dan klik Simpan biasa untuk generate belakangan.'
+                      : `Membuat ${form.requiredMeetings} sesi kalender dari start date + hari dipilih. Cancel/makeup tidak mengubah target required meetings.`}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {DAYS_OF_WEEK.map((day) => {
@@ -707,7 +720,7 @@ export function ClassesView() {
                     onClick={() => {
                       const savedId =
                         upsertClassMaster({
-                          id: editing.id,
+                          id: editing?.id,
                           displayName: form.displayName,
                           code: form.code || null,
                           type: form.type,
@@ -724,13 +737,25 @@ export function ClassesView() {
                           materialLink: form.materialLink || null,
                           teachingNotes: form.teachingNotes || null,
                           status: form.status
-                        }) || editing.id;
-                      generateClassSchedule({
+                        }) || editing?.id;
+                      if (!savedId) return;
+                      const savedClass = useDashboardStore.getState().classMasters.find((c) => c.id === savedId);
+                      // From here on this class exists — further clicks (retry generate, plain
+                      // Simpan) must update it, not spawn a second Class Master via `creating`.
+                      if (savedClass) {
+                        setCreating(false);
+                        setEditing(savedClass);
+                      }
+                      const createdCount = generateClassSchedule({
                         classId: savedId,
                         startDate: form.startDate,
                         weekdays,
                         startTime: genStartTime
                       });
+                      if (createdCount > 0) {
+                        setCreating(false);
+                        setEditing(null);
+                      }
                     }}
                   >
                     Generate {form.requiredMeetings} sesi
