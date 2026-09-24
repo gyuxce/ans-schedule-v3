@@ -667,13 +667,13 @@ export function SenseiView() {
               </div>
 
               {canEditOps ? (
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-line p-3">
+                <div className="flex flex-col items-start gap-3 rounded-xl border border-line p-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-xs text-ink-soft">
                     Hapus permanen — hanya untuk Sensei yang salah input (belum ada jadwal / sesi / kelas).
                     Kalau sudah punya data, pakai <b>Set INACTIVE</b>.
                   </span>
                   <ConfirmDelete
-                    label="Hapus Sensei"
+                    label="Hapus"
                     confirmLabel="Hapus Sensei"
                     message={`Hapus ${selected.name}?`}
                     onConfirm={async () => {

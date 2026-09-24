@@ -292,12 +292,12 @@ export function UsersView() {
           ) : null}
 
           {editUser.id !== currentUser?.id ? (
-            <div className="mt-2 flex items-center justify-between gap-3 border-t border-line pt-3">
+            <div className="mt-2 flex flex-col items-start gap-3 border-t border-line pt-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-xs text-ink-soft">
                 Hapus profil login. Untuk memblokir total, hapus juga user di Supabase Authentication.
               </span>
               <ConfirmDelete
-                label="Hapus akun"
+                label="Hapus"
                 confirmLabel="Hapus akun"
                 message={`Hapus akun ${editUser.name}?`}
                 onConfirm={async () => {
