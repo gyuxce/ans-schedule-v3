@@ -63,6 +63,28 @@ function parseSettings(rows: Record<string, unknown>[]): AppSettings {
   };
 }
 
+// PostgREST caps a single `select` at 1000 rows by default. `schedules` alone
+// already exceeds that (every generated recurring session is its own row), so
+// a plain `.select('*')` silently drops whatever sorts past row 1000 — no
+// error, just missing data. Page through in 1000-row batches instead.
+const FETCH_PAGE_SIZE = 1000;
+
+async function fetchAllRows<T>(
+  build: (rangeFrom: number, rangeTo: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const all: T[] = [];
+  let offset = 0;
+  for (;;) {
+    const { data, error } = await build(offset, offset + FETCH_PAGE_SIZE - 1);
+    if (error) return { data: all, error };
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < FETCH_PAGE_SIZE) break;
+    offset += FETCH_PAGE_SIZE;
+  }
+  return { data: all, error: null };
+}
+
 export async function loadDashboardSnapshot(): Promise<DashboardSnapshot | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
@@ -85,22 +107,31 @@ export async function loadDashboardSnapshot(): Promise<DashboardSnapshot | null>
     classRes,
     enrollmentRes
   ] = await Promise.all([
-    supabase.from('sensei').select('*'),
-    supabase.from('sensei_status').select('*'),
-    supabase.from('students').select('*'),
-    supabase.from('groups').select('*'),
-    supabase.from('schedules').select('*').order('date', { ascending: true }),
-    supabase.from('sensei_availability').select('*'),
-    supabase.from('session_logs').select('*'),
-    supabase.from('session_reports').select('*'),
-    supabase.from('session_student_records').select('*'),
-    supabase.from('teaching_qa_scores').select('*'),
+    fetchAllRows((from, to) => supabase.from('sensei').select('*').range(from, to)),
+    fetchAllRows((from, to) => supabase.from('sensei_status').select('*').range(from, to)),
+    fetchAllRows((from, to) => supabase.from('students').select('*').range(from, to)),
+    fetchAllRows((from, to) => supabase.from('groups').select('*').range(from, to)),
+    fetchAllRows((from, to) =>
+      supabase.from('schedules').select('*').order('date', { ascending: true }).range(from, to)
+    ),
+    fetchAllRows((from, to) => supabase.from('sensei_availability').select('*').range(from, to)),
+    fetchAllRows((from, to) => supabase.from('session_logs').select('*').range(from, to)),
+    fetchAllRows((from, to) => supabase.from('session_reports').select('*').range(from, to)),
+    fetchAllRows((from, to) => supabase.from('session_student_records').select('*').range(from, to)),
+    fetchAllRows((from, to) => supabase.from('teaching_qa_scores').select('*').range(from, to)),
+    // Audit Log intentionally windows to the latest 200 — that cap is deliberate, not this bug.
     supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200),
-    supabase.from('profiles').select('*'),
+    fetchAllRows((from, to) => supabase.from('profiles').select('*').range(from, to)),
     supabase.from('app_settings').select('key, value'),
-    supabase.from('level_completions').select('*').order('completed_at', { ascending: false }),
-    supabase.from('class_masters').select('*').order('updated_at', { ascending: false }),
-    supabase.from('enrollments').select('*').order('updated_at', { ascending: false })
+    fetchAllRows((from, to) =>
+      supabase.from('level_completions').select('*').order('completed_at', { ascending: false }).range(from, to)
+    ),
+    fetchAllRows((from, to) =>
+      supabase.from('class_masters').select('*').order('updated_at', { ascending: false }).range(from, to)
+    ),
+    fetchAllRows((from, to) =>
+      supabase.from('enrollments').select('*').order('updated_at', { ascending: false }).range(from, to)
+    )
   ]);
 
   // Degrade gracefully: one slow / timed-out table shouldn't blank the whole
