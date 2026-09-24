@@ -714,13 +714,13 @@ export function StudentsView() {
           </div>
 
           {editingStudentId && canManage ? (
-            <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+            <div className="mt-3 flex flex-col items-start gap-3 border-t border-line pt-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-xs text-ink-soft">
                 Hapus permanen — hanya untuk siswa yang salah input (belum ada enrollment / jadwal / laporan).
                 Kalau sudah punya data, pakai status <b>Tidak aktif</b>.
               </span>
               <ConfirmDelete
-                label="Hapus siswa"
+                label="Hapus"
                 confirmLabel="Hapus siswa"
                 message={`Hapus ${selected?.name ?? 'siswa ini'}?`}
                 onConfirm={async () => {
