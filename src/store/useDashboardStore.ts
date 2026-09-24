@@ -807,14 +807,8 @@ export const useDashboardStore = create<DashboardStore>()(
         const state = get();
         const session = state.schedules.find((item) => item.id === scheduleId);
         if (!session) return;
-        const teachingSensei = state.sensei.find((item) => item.id === session.senseiId);
         const clockInAt = at ?? new Date().toISOString();
-        const lateJoin = isLateJoin(
-          session,
-          clockInAt,
-          state.settings.lateGraceMinutes,
-          teachingSensei?.timezone
-        );
+        const lateJoin = isLateJoin(session, clockInAt, state.settings.lateGraceMinutes);
         let savedLog = null as ReturnType<typeof get>['sessionLogs'][number] | null;
         set((current) => {
           const existing = current.sessionLogs.find((item) => item.scheduleId === scheduleId);
@@ -853,7 +847,6 @@ export const useDashboardStore = create<DashboardStore>()(
         const state = get();
         const session = state.schedules.find((item) => item.id === scheduleId);
         if (!session) return;
-        const teachingSensei = state.sensei.find((item) => item.id === session.senseiId);
         let savedLog = null as ReturnType<typeof get>['sessionLogs'][number] | null;
         set((current) => {
           const existing = current.sessionLogs.find((item) => item.scheduleId === scheduleId);
@@ -863,12 +856,7 @@ export const useDashboardStore = create<DashboardStore>()(
             senseiId: session.senseiId,
             clockInAt,
             clockOutAt,
-            lateJoin: isLateJoin(
-              session,
-              clockInAt,
-              current.settings.lateGraceMinutes,
-              teachingSensei?.timezone
-            ),
+            lateJoin: isLateJoin(session, clockInAt, current.settings.lateGraceMinutes),
             overridden: true
           };
           savedLog = log;

@@ -35,10 +35,15 @@ export function timezoneLabel(timezone?: string | null) {
   return option ? `${option.abbreviation} · ${option.label}` : 'WIB';
 }
 
-/** Interpret local class date+time in the Sensei's zone as an absolute UTC instant. */
-export function classStartUtc(date: string, startTime: string, timezone?: string | null) {
-  const zone = normalizeTimezone(timezone);
-  return fromZonedTime(`${date}T${startTime}:00`, zone);
+/**
+ * Interpret a schedule's date+time as an absolute UTC instant. Admin always
+ * types this in the school's home timezone (WIB) regardless of which zone
+ * the assigned Sensei teaches from — a JST Sensei scheduled for "19:00"
+ * needs to be online at 21:00 their own wall clock, not 19:00 JST. Use
+ * `formatInSenseiZone` to show that Sensei their own local equivalent.
+ */
+export function classStartUtc(date: string, startTime: string) {
+  return fromZonedTime(`${date}T${startTime}:00`, 'Asia/Jakarta');
 }
 
 export function formatInSenseiZone(

@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { useDashboardStore } from '../store/useDashboardStore';
 import { ThemeToggle } from './layout/ThemeToggle';
 import { Button } from './ui/Button';
+import { PasswordField } from './ui/PasswordField';
 
 export function LoginView() {
   const configured = isSupabaseConfigured();
   const signInWithEmail = useDashboardStore((state) => state.signInWithEmail);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   return (
@@ -64,25 +64,12 @@ export function LoginView() {
                 </label>
                 <label className="block">
                   <span className="ui-label">Password</span>
-                  <div className="relative">
-                    <input
-                      className="ui-input pr-10"
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                    />
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      onClick={() => setShowPassword((value) => !value)}
-                      aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-                      className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-ink-soft hover:text-ink"
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
+                  <PasswordField
+                    value={password}
+                    onChange={setPassword}
+                    required
+                    autoComplete="current-password"
+                  />
                 </label>
                 <Button tone="primary" className="mt-1 h-10 w-full" disabled={loading}>
                   {loading ? <Loader2 className="animate-spin" size={16} /> : null}

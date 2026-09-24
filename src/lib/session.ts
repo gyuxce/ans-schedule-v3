@@ -24,16 +24,12 @@ export function workflowLabel(state: SessionWorkflowState) {
 }
 
 /**
- * Late-join compares clock-in (absolute) against class start interpreted
- * in the teaching Sensei's timezone, then applies grace minutes.
+ * Late-join compares clock-in (absolute) against class start — always
+ * anchored to WIB, the timezone Admin schedules in, regardless of which
+ * zone the teaching Sensei is actually in — then applies grace minutes.
  */
-export function isLateJoin(
-  session: ClassSession,
-  clockInAt: string,
-  graceMinutes: number,
-  senseiTimezone?: string | null
-) {
-  const scheduled = classStartUtc(session.date, session.startTime, senseiTimezone);
+export function isLateJoin(session: ClassSession, clockInAt: string, graceMinutes: number) {
+  const scheduled = classStartUtc(session.date, session.startTime);
   const actual = new Date(clockInAt);
   const diff = (actual.getTime() - scheduled.getTime()) / 60000;
   return diff > graceMinutes;
