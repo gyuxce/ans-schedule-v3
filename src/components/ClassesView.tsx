@@ -486,7 +486,7 @@ export function ClassesView() {
                   value: form.studentIds.map((id) => displayName(allStudents, id)).join(', ') || '—',
                   full: true
                 },
-                { label: 'Google Meet', value: form.meetLink || '—', full: true },
+                { label: 'Progres kelas', value: form.meetLink || '—', full: true },
                 { label: 'Classroom', value: form.classroomLink || '—', full: true },
                 { label: 'Chat', value: form.chatLink || '—', full: true },
                 { label: 'Material', value: form.materialLink || '—', full: true },
@@ -621,7 +621,7 @@ export function ClassesView() {
 
               <div className="grid gap-3 md:grid-cols-2">
                 <label>
-                  <span className="ui-label">Google Meet / room</span>
+                  <span className="ui-label">Progres kelas</span>
                   <input
                     className="ui-input"
                     value={form.meetLink}

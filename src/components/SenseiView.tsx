@@ -15,6 +15,7 @@ import { FilterChips } from './ui/FilterChips';
 import { Meter } from './ui/Meter';
 import { Modal } from './ui/Modal';
 import { PageIntro } from './ui/PageIntro';
+import { PasswordField } from './ui/PasswordField';
 import { WeekNav } from './ui/WeekNav';
 
 const LABEL_TONE = {
@@ -533,24 +534,15 @@ export function SenseiView() {
                   <div className="grid gap-2 md:grid-cols-2">
                     <label>
                       <span className="ui-label">Password login</span>
-                      <input
-                        className="ui-input"
-                        type="password"
-                        autoComplete="new-password"
+                      <PasswordField
                         value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
+                        onChange={setLoginPassword}
                         placeholder="Minimal 6 karakter"
                       />
                     </label>
                     <label>
                       <span className="ui-label">Ulangi password</span>
-                      <input
-                        className="ui-input"
-                        type="password"
-                        autoComplete="new-password"
-                        value={loginPassword2}
-                        onChange={(e) => setLoginPassword2(e.target.value)}
-                      />
+                      <PasswordField value={loginPassword2} onChange={setLoginPassword2} />
                     </label>
                   </div>
                   {loginPassword && loginPassword !== loginPassword2 ? (

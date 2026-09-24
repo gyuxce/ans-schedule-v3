@@ -7,6 +7,7 @@ import { Button } from './ui/Button';
 import { ConfirmDelete } from './ui/ConfirmDelete';
 import { Modal } from './ui/Modal';
 import { PageIntro } from './ui/PageIntro';
+import { PasswordField } from './ui/PasswordField';
 
 export function UsersView() {
   const users = useDashboardStore((state) => state.users);
@@ -176,21 +177,15 @@ export function UsersView() {
             value={form.email}
             onChange={(event) => setForm({ ...form, email: event.target.value })}
           />
-          <input
-            className="ui-input"
-            placeholder="Password (min. 6)"
-            type="password"
-            autoComplete="new-password"
+          <PasswordField
             value={form.password}
-            onChange={(event) => setForm({ ...form, password: event.target.value })}
+            onChange={(value) => setForm({ ...form, password: value })}
+            placeholder="Password (min. 6)"
           />
-          <input
-            className="ui-input"
-            placeholder="Ulangi password"
-            type="password"
-            autoComplete="new-password"
+          <PasswordField
             value={form.password2}
-            onChange={(event) => setForm({ ...form, password2: event.target.value })}
+            onChange={(value) => setForm({ ...form, password2: value })}
+            placeholder="Ulangi password"
           />
           {form.password && form.password !== form.password2 ? (
             <p className="text-xs font-semibold text-danger">Password tidak sama.</p>

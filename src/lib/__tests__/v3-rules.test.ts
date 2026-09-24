@@ -188,30 +188,30 @@ describe('session workflow and late join', () => {
     ).toBe('in_progress');
   });
 
-  it('marks late join after scheduled start when grace is 0 (Sensei WIB)', () => {
+  it('marks late join after scheduled start when grace is 0', () => {
     const session = classOf({ id: 'c1', date: '2026-08-14', startTime: '09:00', endTime: '10:00' });
-    // 09:00 Asia/Jakarta = 02:00 UTC
-    expect(isLateJoin(session, '2026-08-14T02:00:01.000Z', 0, 'Asia/Jakarta')).toBe(true);
-    expect(isLateJoin(session, '2026-08-14T02:00:00.000Z', 0, 'Asia/Jakarta')).toBe(false);
+    // 09:00 WIB (Asia/Jakarta) = 02:00 UTC
+    expect(isLateJoin(session, '2026-08-14T02:00:01.000Z', 0)).toBe(true);
+    expect(isLateJoin(session, '2026-08-14T02:00:00.000Z', 0)).toBe(false);
   });
 
-  it('uses Sensei timezone, not a forced WIB clock', () => {
+  it('applies grace minutes on top of the WIB-anchored start', () => {
     const session = classOf({ id: 'c1', date: '2026-08-14', startTime: '09:00', endTime: '10:00' });
-    // 09:00 Asia/Jayapura (WIT, UTC+9) = 00:00 UTC
-    expect(isLateJoin(session, '2026-08-14T00:00:00.000Z', 0, 'Asia/Jayapura')).toBe(false);
-    expect(isLateJoin(session, '2026-08-14T00:01:00.000Z', 0, 'Asia/Jayapura')).toBe(true);
-    // Same absolute time would be late for WIB (class starts 02:00 UTC)
-    expect(isLateJoin(session, '2026-08-14T00:00:00.000Z', 0, 'Asia/Jakarta')).toBe(false);
-    expect(isLateJoin(session, '2026-08-14T01:59:00.000Z', 0, 'Asia/Jakarta')).toBe(false);
-    expect(isLateJoin(session, '2026-08-14T02:06:00.000Z', 5, 'Asia/Jakarta')).toBe(true);
-    expect(isLateJoin(session, '2026-08-14T02:05:00.000Z', 5, 'Asia/Jakarta')).toBe(false);
+    expect(isLateJoin(session, '2026-08-14T01:59:00.000Z', 0)).toBe(false);
+    expect(isLateJoin(session, '2026-08-14T02:06:00.000Z', 5)).toBe(true);
+    expect(isLateJoin(session, '2026-08-14T02:05:00.000Z', 5)).toBe(false);
   });
 
-  it('supports a Sensei teaching from Japan (JST, UTC+9)', () => {
+  it('a Japan-based Sensei scheduled for "09:00" must be online at 09:00 WIB (11:00 JST), not 09:00 JST', () => {
     const session = classOf({ id: 'c1', date: '2026-08-14', startTime: '09:00', endTime: '10:00' });
-    // 09:00 Asia/Tokyo (JST, UTC+9) = 00:00 UTC
-    expect(isLateJoin(session, '2026-08-14T00:00:00.000Z', 0, 'Asia/Tokyo')).toBe(false);
-    expect(isLateJoin(session, '2026-08-14T00:01:00.000Z', 0, 'Asia/Tokyo')).toBe(true);
+    // 09:00 WIB = 11:00 JST = 02:00 UTC. Clocking in exactly then is on time...
+    expect(isLateJoin(session, '2026-08-14T02:00:00.000Z', 0)).toBe(false);
+    // ...one minute later is late, same as any other Sensei — the Sensei's own timezone never
+    // shifts what "09:00" on the schedule means, it only changes their local wall-clock label for it.
+    expect(isLateJoin(session, '2026-08-14T02:00:01.000Z', 0)).toBe(true);
+    // 09:00 JST (00:00 UTC) — what the old, incorrect behavior expected — is 2 hours *before* the
+    // real WIB-anchored start, so clocking in then is early, not on time and not late either.
+    expect(isLateJoin(session, '2026-08-14T00:00:00.000Z', 0)).toBe(false);
   });
 });
 
