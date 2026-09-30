@@ -24,6 +24,18 @@ const LABEL_TONE = {
   CUTI: 'sky'
 } as const;
 
+const JLPT_ORDER = ['N1', 'N2', 'N3', 'N4', 'N5'];
+/** Pull out any JLPT tokens (N1–N5) from the free-form "Level mengajar" list,
+ *  highest level first, so it's scannable at a glance in the roster. */
+function jlptLevels(levels: string[]) {
+  const found = new Set<string>();
+  for (const level of levels) {
+    const match = level.toUpperCase().match(/\bN[1-5]\b/);
+    if (match) found.add(match[0]);
+  }
+  return JLPT_ORDER.filter((level) => found.has(level));
+}
+
 const emptyForm = (): Omit<Sensei, 'id'> => ({
   name: '',
   displayName: '',
@@ -215,15 +227,23 @@ export function SenseiView() {
 
   const groups = useMemo(() => {
     if (filter !== 'all') return [{ key: 'flat', label: '', rows: roster }];
-    const unassignedRows = roster.filter((row) => row.labels.includes('UNASSIGNED'));
-    const newRows = roster.filter((row) => !row.labels.includes('UNASSIGNED') && row.labels.includes('NEW'));
-    const assignedRows = roster.filter(
+    // INACTIVE always sorts to its own group at the bottom, regardless of any
+    // other label — otherwise it alphabetically interleaves with ACTIVE Sensei
+    // in "Bertugas" and clutters the list.
+    const activeRows = roster.filter((row) => row.item.primaryStatus === 'ACTIVE');
+    const inactiveRows = roster.filter((row) => row.item.primaryStatus !== 'ACTIVE');
+    const unassignedRows = activeRows.filter((row) => row.labels.includes('UNASSIGNED'));
+    const newRows = activeRows.filter(
+      (row) => !row.labels.includes('UNASSIGNED') && row.labels.includes('NEW')
+    );
+    const assignedRows = activeRows.filter(
       (row) => !row.labels.includes('UNASSIGNED') && !row.labels.includes('NEW')
     );
     return [
       { key: 'unassigned', label: 'Perlu ditugaskan', rows: unassignedRows },
       { key: 'new', label: 'Baru — sudah bertugas', rows: newRows },
-      { key: 'assigned', label: 'Bertugas', rows: assignedRows }
+      { key: 'assigned', label: 'Bertugas', rows: assignedRows },
+      { key: 'inactive', label: 'Nonaktif', rows: inactiveRows }
     ].filter((group) => group.rows.length);
   }, [roster, filter]);
 
@@ -305,6 +325,11 @@ export function SenseiView() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="truncate font-semibold text-ink">{senseiDisplayName(item)}</span>
+                          {jlptLevels(item.levels).map((level) => (
+                            <Badge key={level} tone="muted">
+                              {level}
+                            </Badge>
+                          ))}
                           {timezoneAbbreviation(item.timezone) !== 'WIB' ? (
                             <span className="text-[11px] font-medium text-ink-soft">
                               {timezoneAbbreviation(item.timezone)}

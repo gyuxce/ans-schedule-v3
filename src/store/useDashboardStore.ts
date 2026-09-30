@@ -39,7 +39,12 @@ import {
   deleteEnrollmentRemote,
   writeAudit
 } from '../services/supabaseData';
-import { ensureClassEnrollments, progressEnrollmentJourney } from '../lib/enrollment';
+import {
+  ensureClassEnrollments,
+  findActiveEnrollment,
+  isCurrentEnrollmentStatus,
+  progressEnrollmentJourney
+} from '../lib/enrollment';
 import type {
   AppRole,
   AppSettings,
@@ -1248,8 +1253,7 @@ export const useDashboardStore = create<DashboardStore>()(
             return {
               ...student,
               currentLevel: next.level || student.currentLevel,
-              type: next.classType || student.type,
-              senseiId: next.senseiId || student.senseiId
+              type: next.classType || student.type
             };
           });
           return {
@@ -1329,7 +1333,8 @@ export const useDashboardStore = create<DashboardStore>()(
           createId,
           actorName: state.currentUser?.name,
           classType: nextClass?.type ?? student.type,
-          senseiId: nextClass?.senseiId ?? student.senseiId ?? null,
+          senseiId:
+            nextClass?.senseiId ?? findActiveEnrollment(state.enrollments, studentId, level)?.senseiId ?? null,
           classId: nextClass?.id ?? null,
           requiredMeetings: nextClass?.requiredMeetings ?? null,
           plannedEndDate: nextClass?.plannedEndDate ?? null,
@@ -1810,6 +1815,7 @@ export function useScopedData() {
   const sessionLogs = useDashboardStore((state) => state.sessionLogs);
   const sessionReports = useDashboardStore((state) => state.sessionReports);
   const qaScores = useDashboardStore((state) => state.qaScores);
+  const enrollments = useDashboardStore((state) => state.enrollments);
   const permissions = getPermissions(currentUser?.role ?? 'Sensei');
   const linkedSenseiId = resolveSenseiId(sensei, {
     senseiId: currentUser?.senseiId,
@@ -1831,9 +1837,18 @@ export function useScopedData() {
   }
 
   const senseiId = linkedSenseiId;
+  // A student "belongs" to this Sensei when their current active Enrollment
+  // says so, or they sit in one of this Sensei's Class Masters — not a cached
+  // per-student field, which never stayed in sync when a Sensei was swapped.
+  const myStudentIds = new Set([
+    ...enrollments
+      .filter((item) => item.senseiId === senseiId && isCurrentEnrollmentStatus(item.status))
+      .map((item) => item.studentId),
+    ...classMasters.filter((item) => item.senseiId === senseiId).flatMap((item) => item.studentIds)
+  ]);
   return {
     sensei: sensei.filter((item) => item.id === senseiId),
-    students: students.filter((item) => item.senseiId === senseiId),
+    students: students.filter((item) => myStudentIds.has(item.id)),
     classMasters: classMasters.filter((item) => item.senseiId === senseiId),
     schedules: schedules.filter((item) => item.senseiId === senseiId),
     availability: availability.filter((item) => item.senseiId === senseiId),
