@@ -62,6 +62,7 @@ export function SenseiView() {
   const deleteSensei = useDashboardStore((state) => state.deleteSensei);
   const updateSenseiTimezone = useDashboardStore((state) => state.updateSenseiTimezone);
   const upsertSensei = useDashboardStore((state) => state.upsertSensei);
+  const updateSenseiLevels = useDashboardStore((state) => state.updateSenseiLevels);
   const setSenseiLeave = useDashboardStore((state) => state.setSenseiLeave);
   const createUserLogin = useDashboardStore((state) => state.createUserLogin);
   const currentUser = useDashboardStore((state) => state.currentUser);
@@ -81,6 +82,8 @@ export function SenseiView() {
   const [creatingLogin, setCreatingLogin] = useState(false);
   const [detailMode, setDetailMode] = useState<'view' | 'edit'>('view');
   const [filter, setFilter] = useState<'all' | 'unassigned' | 'new' | 'below_target'>('all');
+  const [levelsDraft, setLevelsDraft] = useState('');
+  const [savingLevels, setSavingLevels] = useState(false);
   const selected = visible.find((item) => item.id === selectedId);
   const selectedLeave = useMemo(
     () => leavePeriods.find((item) => item.senseiId === selectedId && item.status === 'approved'),
@@ -109,6 +112,7 @@ export function SenseiView() {
     setReason('');
     setLoginPassword('');
     setLoginPassword2('');
+    setLevelsDraft(item.levels.join(', '));
     setForm({
       name: item.name,
       displayName: item.displayName || '',
@@ -189,6 +193,19 @@ export function SenseiView() {
     setCreatingLogin(false);
     setLoginPassword('');
     setLoginPassword2('');
+  };
+
+  const saveLevelsOnly = () => {
+    if (!selected) return;
+    setSavingLevels(true);
+    updateSenseiLevels(
+      selected.id,
+      levelsDraft
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    );
+    setSavingLevels(false);
   };
 
   const roster = useMemo(() => {
@@ -438,6 +455,26 @@ export function SenseiView() {
                     : [])
                 ]}
               />
+              {permissions.canEditSenseiLevels && !canEditOps ? (
+                <label className="mt-3 block">
+                  <span className="ui-label">Level mengajar (pisahkan koma)</span>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      className="ui-input flex-1"
+                      value={levelsDraft}
+                      onChange={(e) => setLevelsDraft(e.target.value)}
+                      placeholder={CLASS_LEVELS.slice(0, 4).join(', ')}
+                    />
+                    <Button tone="primary" disabled={savingLevels} onClick={saveLevelsOnly}>
+                      Simpan level
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-xs text-ink-soft">
+                    Kyouiku bisa mengubah level mengajar Sensei di sini. Data profil lain (nama, email, CUTI,
+                    status, akun login) tetap hanya bisa diubah Super Admin.
+                  </p>
+                </label>
+              ) : null}
             </>
           ) : canEditOps ? (
             <div className="grid gap-3 md:grid-cols-2">
