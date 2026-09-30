@@ -98,6 +98,7 @@ export function ClassesView() {
   const [genStartTime, setGenStartTime] = useState('19:00');
   const [filter, setFilter] = useState<ClassFilter>('all');
   const [view, setView] = useState<'compact' | 'cards'>('compact');
+  const [search, setSearch] = useState('');
 
   const openCreate = () => {
     setForm({
@@ -189,16 +190,24 @@ export function ClassesView() {
     };
   }, [rows]);
 
+  const query = search.trim().toLowerCase();
+
   const visible = useMemo(
     () =>
-      rows.filter(({ health }) => {
+      rows.filter(({ item, health }) => {
+        if (query) {
+          const senseiName = displayName(allSensei, item.senseiId);
+          const studentNames = item.studentIds.map((id) => displayName(allStudents, id)).join(' ');
+          const haystack = `${item.displayName} ${item.code ?? ''} ${item.level} ${senseiName} ${studentNames}`.toLowerCase();
+          if (!haystack.includes(query)) return false;
+        }
         if (filter === 'all') return true;
         if (filter === 'attention') return ATTENTION.has(health.status);
         if (filter === 'on_track') return health.status === 'on_track';
         if (filter === 'idle') return health.status === 'inactive';
         return health.status === 'completed';
       }),
-    [rows, filter]
+    [rows, filter, query, allSensei, allStudents]
   );
 
   return (
@@ -217,6 +226,13 @@ export function ClassesView() {
         Class Master adalah wadah kelas (level, siswa, required meetings, resources). Generate jadwal berulang
         membuat sesi kalender; progress memakai Session X of X.
       </PageIntro>
+
+      <input
+        className="ui-input h-10"
+        placeholder="Cari kelas: nama siswa, sensei, atau level…"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+      />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
