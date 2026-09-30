@@ -69,13 +69,32 @@ function parseSettings(rows: Record<string, unknown>[]): AppSettings {
 // error, just missing data. Page through in 1000-row batches instead.
 const FETCH_PAGE_SIZE = 1000;
 
+// Right after Supabase refreshes the access token (e.g. reopening a tab left
+// idle overnight), the ~15 dashboard queries fire in parallel immediately.
+// A JWT's `iat` can land a hair ahead of PostgREST's own clock, so some of
+// that first parallel batch get rejected with PGRST303 ("JWT issued at
+// future") while the rest succeed — a transient race, not a real auth
+// failure. One retry after a short delay clears it. Without this, whichever
+// table lost the race rendered as silently empty (no error shown) — this is
+// the likely cause of "kelas hilang keesokan harinya" reports.
+async function withJwtSkewRetry<T extends { error: { message: string } | null }>(
+  run: () => PromiseLike<T>
+): Promise<T> {
+  const result = await run();
+  if (result.error && /JWT issued at future/i.test(result.error.message)) {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    return run();
+  }
+  return result;
+}
+
 async function fetchAllRows<T>(
   build: (rangeFrom: number, rangeTo: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
 ): Promise<{ data: T[]; error: { message: string } | null }> {
   const all: T[] = [];
   let offset = 0;
   for (;;) {
-    const { data, error } = await build(offset, offset + FETCH_PAGE_SIZE - 1);
+    const { data, error } = await withJwtSkewRetry(() => build(offset, offset + FETCH_PAGE_SIZE - 1));
     if (error) return { data: all, error };
     const rows = data ?? [];
     all.push(...rows);
@@ -120,9 +139,9 @@ export async function loadDashboardSnapshot(): Promise<DashboardSnapshot | null>
     fetchAllRows((from, to) => supabase.from('session_student_records').select('*').range(from, to)),
     fetchAllRows((from, to) => supabase.from('teaching_qa_scores').select('*').range(from, to)),
     // Audit Log intentionally windows to the latest 200 — that cap is deliberate, not this bug.
-    supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200),
+    withJwtSkewRetry(() => supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200)),
     fetchAllRows((from, to) => supabase.from('profiles').select('*').range(from, to)),
-    supabase.from('app_settings').select('key, value'),
+    withJwtSkewRetry(() => supabase.from('app_settings').select('key, value')),
     fetchAllRows((from, to) =>
       supabase.from('level_completions').select('*').order('completed_at', { ascending: false }).range(from, to)
     ),
@@ -148,7 +167,10 @@ export async function loadDashboardSnapshot(): Promise<DashboardSnapshot | null>
     ['session_student_records', studentRecordsRes],
     ['teaching_qa_scores', qaRes],
     ['audit_logs', auditRes],
-    ['profiles', profilesRes]
+    ['profiles', profilesRes],
+    ['level_completions', levelRes],
+    ['class_masters', classRes],
+    ['enrollments', enrollmentRes]
   ];
   for (const [name, result] of named) {
     if (result.error) console.warn(`loadDashboardSnapshot: ${name} — ${result.error.message}`);
