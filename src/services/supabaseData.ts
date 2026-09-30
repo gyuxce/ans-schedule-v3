@@ -466,6 +466,15 @@ export async function upsertSenseiRemote(sensei: Sensei) {
   });
 }
 
+/** Narrow write for Kyouiku — only ever touches level_mengajar, never routes
+ *  through upsertSenseiRemote (which also writes sensei_status, Super-Admin-only). */
+export async function updateSenseiLevelsRemote(senseiId: string, levels: string[]) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase.from('sensei').update({ level_mengajar: levels.join(',') }).eq('id', senseiId);
+  if (error) throw new Error(error.message);
+}
+
 export async function upsertSenseiTimezoneRemote(senseiId: string, timezone: SenseiTimezone) {
   const supabase = getSupabase();
   if (!supabase) return;

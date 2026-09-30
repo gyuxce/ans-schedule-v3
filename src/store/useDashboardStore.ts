@@ -27,6 +27,7 @@ import {
   upsertSenseiStatusRemote,
   upsertSenseiTimezoneRemote,
   upsertSenseiRemote,
+  updateSenseiLevelsRemote,
   upsertSessionLogRemote,
   upsertEnrollmentRemote,
   upsertSessionReportRemote,
@@ -185,6 +186,7 @@ interface DashboardStore extends DashboardSnapshot {
   upsertQaScore: (senseiId: string, month: string, score: number, notes: string) => void;
   overrideSenseiStatus: (senseiId: string, status: 'ACTIVE' | 'INACTIVE', reason: string) => void;
   updateSenseiTimezone: (senseiId: string, timezone: SenseiTimezone) => void;
+  updateSenseiLevels: (senseiId: string, levels: string[]) => void;
   upsertSensei: (input: Omit<Sensei, 'id'> & { id?: string }) => string | null;
   setSenseiLeave: (
     senseiId: string,
@@ -1094,6 +1096,30 @@ export const useDashboardStore = create<DashboardStore>()(
         });
         void safeRemote(() => upsertSenseiTimezoneRemote(senseiId, timezone), 'Update timezone Sensei');
         toast.success('Timezone Sensei disimpan');
+      },
+      updateSenseiLevels: (senseiId, levels) => {
+        const state = get();
+        if (!getPermissions(state.currentUser?.role ?? 'Sensei').canEditSenseiLevels) {
+          toast.error('Tidak punya izin mengubah level mengajar Sensei');
+          return;
+        }
+        const existing = state.sensei.find((item) => item.id === senseiId);
+        if (!existing) return;
+        set((current) => {
+          pushAudit(current, {
+            action: 'update_sensei',
+            entity: 'sensei',
+            recordId: senseiId,
+            oldValue: { levels: existing.levels },
+            newValue: { levels }
+          });
+          return {
+            sensei: current.sensei.map((item) => (item.id === senseiId ? { ...item, levels } : item)),
+            auditLogs: current.auditLogs
+          };
+        });
+        void safeRemote(() => updateSenseiLevelsRemote(senseiId, levels), 'Simpan level mengajar');
+        toast.success('Level mengajar disimpan');
       },
       upsertSensei: (input) => {
         if (!input.name.trim()) {

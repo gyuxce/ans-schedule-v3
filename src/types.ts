@@ -294,6 +294,9 @@ export interface Permissions {
   canViewAllSensei: boolean;
   /** Super Admin/Ops: export all Sensei EOM. Sensei: view own only (no export). */
   canExportEomReport: boolean;
+  /** Super Admin + Kyouiku: edit a Sensei's "Level mengajar" (JLPT levels taught) only —
+   *  narrower than canManageUsers, which also covers profile/CUTI/status/login/delete. */
+  canEditSenseiLevels: boolean;
 }
 
 export interface WorkloadMetrics {
