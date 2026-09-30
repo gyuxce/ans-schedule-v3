@@ -31,8 +31,8 @@ export function SettingsView() {
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <PageIntro kicker="Pengaturan" title="Pengaturan operasional">
-        Grace late-join dihitung dari jam mulai kelas di timezone Sensei pengajar (WIB / WITA / WIT / JST),
-        bukan dari zona browser atau paksa WIB.
+        Grace late-join dihitung dari jam mulai kelas di WIB (jadwal selalu diinput dalam WIB, apa pun
+        timezone Sensei pengajar) — bukan dari zona browser atau timezone Sensei.
       </PageIntro>
 
       <section className="ui-card space-y-3 p-5">
@@ -56,7 +56,7 @@ export function SettingsView() {
         <div>
           <p className="ui-label">Grace late-join (menit)</p>
           <p className="mt-1 text-xs text-ink-soft">
-            Clock-in lebih dari N menit setelah jam mulai kelas (zona Sensei) ditandai terlambat. Isi 0 untuk
+            Clock-in lebih dari N menit setelah jam mulai kelas (WIB) ditandai terlambat. Isi 0 untuk
             tanpa toleransi.
           </p>
         </div>
