@@ -151,9 +151,15 @@ ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 -- PROFILES
 -- =========================================================
 
+-- Kyouiku needs read access here too — the Sensei roster's "belum login" /
+-- "Akun login: Sudah ada" indicators compare each Sensei's email against
+-- this table client-side, and previously only Super Admin (is_ops) could see
+-- rows other than their own, so every one of those indicators silently read
+-- as "belum login" for Kyouiku regardless of reality. Still read-only:
+-- v3_profiles_update_ops / insert_ops / delete_ops below remain Super-Admin-only.
 CREATE POLICY v3_profiles_select
   ON profiles FOR SELECT TO authenticated
-  USING (id = (SELECT auth.uid()) OR (SELECT public.is_ops()));
+  USING (id = (SELECT auth.uid()) OR (SELECT public.is_kyouiku_or_ops()));
 
 CREATE POLICY v3_profiles_insert_own
   ON profiles FOR INSERT TO authenticated
