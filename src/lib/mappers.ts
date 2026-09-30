@@ -68,7 +68,6 @@ export function mapStudent(row: Record<string, unknown>): Student {
     type: (row.type as ClassType) || 'Private',
     currentLevel: String(row.level_sekarang || row.level || ''),
     startingLevel: String(row.level_awal || row.level || ''),
-    senseiId: undefined,
     isActive: row.is_active !== false,
     academicNotes: row.special_note ? String(row.special_note) : undefined
   };

@@ -164,7 +164,6 @@ export function StudentsView() {
       type: selected.type,
       currentLevel: selected.currentLevel,
       startingLevel: selected.startingLevel,
-      senseiId: selected.senseiId,
       isActive: selected.isActive,
       academicNotes: selected.academicNotes || ''
     });
@@ -322,8 +321,8 @@ export function StudentsView() {
                       {selected.email ? ` · ${selected.email}` : ''}
                     </p>
                     <p className="mt-1 text-sm text-ink-soft">
-                      Starting level: {selected.startingLevel || '—'} · Sensei profil{' '}
-                      {displayName(allSensei, selected.senseiId)}
+                      Starting level: {selected.startingLevel || '—'} · Sensei terkait{' '}
+                      {currentEnrollment?.senseiId ? displayName(allSensei, currentEnrollment.senseiId) : '—'}
                     </p>
                   </div>
                 </div>

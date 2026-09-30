@@ -82,7 +82,6 @@ export interface Student {
   type: ClassType;
   currentLevel: string;
   startingLevel: string;
-  senseiId?: string;
   isActive: boolean;
   academicNotes?: string;
 }

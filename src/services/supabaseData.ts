@@ -164,12 +164,12 @@ export async function loadDashboardSnapshot(): Promise<DashboardSnapshot | null>
     mapSenseiWithStatus(mapSensei(row), statusBySensei.get(String(row.id)))
   );
 
-  const students = ((studentsRes.data || []) as Record<string, unknown>[]).map((row) => {
-    const mapped = mapStudent(row);
-    const senseiName = String(row.sensei_name || '');
-    const match = sensei.find((item) => item.name.toLowerCase() === senseiName.toLowerCase());
-    return { ...mapped, senseiId: match?.id };
-  });
+  // "Sensei terkait" is never read off this row — it's derived live from the
+  // student's current active Enrollment (see findActiveEnrollment), which is
+  // what actually stays in sync when a sensei is reassigned. The old approach
+  // (name-matching a legacy `sensei_name` text column from the V2 migration)
+  // never got updated after a swap and silently went stale/empty.
+  const students = ((studentsRes.data || []) as Record<string, unknown>[]).map((row) => mapStudent(row));
 
   const leavePeriods = ((statusRes.data || []) as Record<string, unknown>[])
     .map((row) => mapLeaveFromStatus(row))
