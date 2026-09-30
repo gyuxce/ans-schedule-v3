@@ -386,12 +386,12 @@ CREATE POLICY v3_session_logs_select
 
 CREATE POLICY v3_session_logs_insert
   ON session_logs FOR INSERT TO authenticated
-  WITH CHECK ((SELECT public.is_ops()) OR sensei_id = (SELECT public.current_sensei_id()));
+  WITH CHECK ((SELECT public.is_kyouiku_or_ops()) OR sensei_id = (SELECT public.current_sensei_id()));
 
 CREATE POLICY v3_session_logs_update
   ON session_logs FOR UPDATE TO authenticated
-  USING ((SELECT public.is_ops()) OR sensei_id = (SELECT public.current_sensei_id()))
-  WITH CHECK ((SELECT public.is_ops()) OR sensei_id = (SELECT public.current_sensei_id()));
+  USING ((SELECT public.is_kyouiku_or_ops()) OR sensei_id = (SELECT public.current_sensei_id()))
+  WITH CHECK ((SELECT public.is_kyouiku_or_ops()) OR sensei_id = (SELECT public.current_sensei_id()));
 
 CREATE POLICY v3_session_logs_delete_ops
   ON session_logs FOR DELETE TO authenticated
@@ -407,7 +407,7 @@ CREATE POLICY v3_session_reports_select
 
 CREATE POLICY v3_session_reports_insert
   ON session_reports FOR INSERT TO authenticated
-  WITH CHECK ((SELECT public.is_ops()) OR public.owns_schedule(schedule_id));
+  WITH CHECK ((SELECT public.is_kyouiku_or_ops()) OR public.owns_schedule(schedule_id));
 
 CREATE POLICY v3_session_reports_update
   ON session_reports FOR UPDATE TO authenticated
