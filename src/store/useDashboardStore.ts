@@ -691,7 +691,12 @@ export const useDashboardStore = create<DashboardStore>()(
           toast.error(editCompositionError);
           return false;
         }
-        if (wouldConflict(state.schedules, next)) {
+        // Exclude the pre-edit copy of this same session: `wouldConflict`'s
+        // pairwise scan finds ALL existing conflicts first, so leaving the
+        // stale record (still under this same id) in the array let any
+        // conflict it was already part of block the edit regardless of the
+        // new time — even a fully conflict-free new time couldn't save.
+        if (wouldConflict(state.schedules.filter((item) => item.id !== id), next)) {
           toast.error('Perubahan menyebabkan konflik jadwal');
           return false;
         }
@@ -788,7 +793,10 @@ export const useDashboardStore = create<DashboardStore>()(
           updatedAt: new Date().toISOString(),
           updatedBy: state.currentUser?.name
         };
-        if (wouldConflict(state.schedules, next)) {
+        // Same stale-self-copy issue as updateClass above: drop the pre-swap
+        // record before checking, or an unrelated conflict it was already
+        // part of (under the old sensei) could block the swap outright.
+        if (wouldConflict(state.schedules.filter((item) => item.id !== id), next)) {
           toast.error('Sensei pengganti sudah punya kelas di jam ini');
           return false;
         }
