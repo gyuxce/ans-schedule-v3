@@ -320,6 +320,58 @@ CREATE POLICY v3_schedules_update_own
   USING ((SELECT public.is_ops()) OR sensei_id = (SELECT public.current_sensei_id()))
   WITH CHECK ((SELECT public.is_ops()) OR sensei_id = (SELECT public.current_sensei_id()));
 
+-- Kyouiku submitting a report on someone else's session (canOverrideAcademic)
+-- needs this same status flip, but Kyouiku must NOT get the broader edit
+-- rights v3_schedules_update_ops reserves for Super Admin (date/time/sensei/
+-- swap/cancel all stay blocked, matching canEditOfficialSchedule=false).
+-- The trigger below enforces that only status/updated_at/updated_by may
+-- actually change under this policy, since RLS itself can't scope a policy
+-- to specific columns. Found live: submitSessionReport as Kyouiku silently
+-- updated 0 rows (no RLS error — UPDATE with an unmatched USING clause just
+-- affects nothing) and the session stayed 'active' forever.
+CREATE POLICY v3_schedules_update_kyouiku_status
+  ON schedules FOR UPDATE TO authenticated
+  USING ((SELECT public.current_profile_role()) = 'Kyouiku')
+  WITH CHECK ((SELECT public.current_profile_role()) = 'Kyouiku');
+
+CREATE OR REPLACE FUNCTION public.enforce_kyouiku_schedule_status_only()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF public.current_profile_role() = 'Kyouiku' THEN
+    IF NEW.sensei_id IS DISTINCT FROM OLD.sensei_id
+      OR NEW.student_id IS DISTINCT FROM OLD.student_id
+      OR NEW.student_ids IS DISTINCT FROM OLD.student_ids
+      OR NEW.group_id IS DISTINCT FROM OLD.group_id
+      OR NEW.class_id IS DISTINCT FROM OLD.class_id
+      OR NEW.type IS DISTINCT FROM OLD.type
+      OR NEW.level IS DISTINCT FROM OLD.level
+      OR NEW.date IS DISTINCT FROM OLD.date
+      OR NEW.start_time IS DISTINCT FROM OLD.start_time
+      OR NEW.end_time IS DISTINCT FROM OLD.end_time
+      OR NEW.original_sensei_id IS DISTINCT FROM OLD.original_sensei_id
+      OR NEW.makeup_of_session_id IS DISTINCT FROM OLD.makeup_of_session_id
+      OR NEW.is_extra IS DISTINCT FROM OLD.is_extra
+      OR NEW.cancellation_reason IS DISTINCT FROM OLD.cancellation_reason
+      OR NEW.cancellation_initiator IS DISTINCT FROM OLD.cancellation_initiator
+      OR NEW.replacement_secured IS DISTINCT FROM OLD.replacement_secured
+      OR NEW.swap_initiator IS DISTINCT FROM OLD.swap_initiator
+      OR NEW.swap_reason IS DISTINCT FROM OLD.swap_reason
+    THEN
+      RAISE EXCEPTION 'Kyouiku hanya boleh mengubah status sesi (laporan/koreksi), bukan jadwal resmi';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS v3_schedules_kyouiku_status_only ON schedules;
+CREATE TRIGGER v3_schedules_kyouiku_status_only
+  BEFORE UPDATE ON schedules
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_kyouiku_schedule_status_only();
+
 CREATE POLICY v3_schedules_delete_ops
   ON schedules FOR DELETE TO authenticated
   USING ((SELECT public.is_ops()));
@@ -495,6 +547,18 @@ CREATE POLICY v3_app_settings_select
 CREATE POLICY v3_app_settings_write_ops
   ON app_settings FOR ALL TO authenticated
   USING ((SELECT public.is_ops())) WITH CHECK ((SELECT public.is_ops()));
+
+-- Pengaturan's own page text says "Hanya Super Admin dan Kyouiku yang dapat
+-- mengubah pengaturan", and canManageSettings=true for Kyouiku app-side, but
+-- this table's write policy was still is_ops()-only. Additive: OR'd with
+-- v3_app_settings_write_ops above (upsert needs both insert+update).
+CREATE POLICY v3_app_settings_write_kyouiku
+  ON app_settings FOR INSERT TO authenticated
+  WITH CHECK ((SELECT public.is_kyouiku_or_ops()));
+
+CREATE POLICY v3_app_settings_update_kyouiku
+  ON app_settings FOR UPDATE TO authenticated
+  USING ((SELECT public.is_kyouiku_or_ops())) WITH CHECK ((SELECT public.is_kyouiku_or_ops()));
 
 -- =========================================================
 -- LEVEL COMPLETIONS
