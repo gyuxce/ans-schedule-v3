@@ -45,7 +45,8 @@ const emptyForm = (): Omit<Sensei, 'id'> => ({
   primaryStatus: 'ACTIVE',
   joinDate: new Date().toISOString().slice(0, 10),
   timezone: 'Asia/Jakarta',
-  notes: ''
+  notes: '',
+  needsAttention: false
 });
 
 export function SenseiView() {
@@ -63,6 +64,7 @@ export function SenseiView() {
   const updateSenseiTimezone = useDashboardStore((state) => state.updateSenseiTimezone);
   const upsertSensei = useDashboardStore((state) => state.upsertSensei);
   const updateSenseiLevels = useDashboardStore((state) => state.updateSenseiLevels);
+  const updateSenseiAttention = useDashboardStore((state) => state.updateSenseiAttention);
   const setSenseiLeave = useDashboardStore((state) => state.setSenseiLeave);
   const createUserLogin = useDashboardStore((state) => state.createUserLogin);
   const currentUser = useDashboardStore((state) => state.currentUser);
@@ -122,7 +124,8 @@ export function SenseiView() {
       primaryStatus: item.primaryStatus,
       joinDate: item.joinDate,
       timezone: item.timezone,
-      notes: item.notes || ''
+      notes: item.notes || '',
+      needsAttention: item.needsAttention
     });
     const leave = leavePeriods.find((row) => row.senseiId === item.id && row.status === 'approved');
     setLeaveStart(leave?.startDate || '');
@@ -249,14 +252,21 @@ export function SenseiView() {
     // in "Bertugas" and clutters the list.
     const activeRows = roster.filter((row) => row.item.primaryStatus === 'ACTIVE');
     const inactiveRows = roster.filter((row) => row.item.primaryStatus !== 'ACTIVE');
-    const unassignedRows = activeRows.filter((row) => row.labels.includes('UNASSIGNED'));
-    const newRows = activeRows.filter(
+    // Need Attention (manually flagged by Kyouiku) takes priority over the
+    // auto-computed UNASSIGNED/NEW labels — a compliance issue is more urgent
+    // to surface than capacity bookkeeping, so a flagged Sensei shows in only
+    // this one group even if they'd otherwise also be UNASSIGNED or NEW.
+    const attentionRows = activeRows.filter((row) => row.item.needsAttention);
+    const remainingActiveRows = activeRows.filter((row) => !row.item.needsAttention);
+    const unassignedRows = remainingActiveRows.filter((row) => row.labels.includes('UNASSIGNED'));
+    const newRows = remainingActiveRows.filter(
       (row) => !row.labels.includes('UNASSIGNED') && row.labels.includes('NEW')
     );
-    const assignedRows = activeRows.filter(
+    const assignedRows = remainingActiveRows.filter(
       (row) => !row.labels.includes('UNASSIGNED') && !row.labels.includes('NEW')
     );
     return [
+      { key: 'attention', label: 'Perlu perhatian', rows: attentionRows },
       { key: 'unassigned', label: 'Perlu ditugaskan', rows: unassignedRows },
       { key: 'new', label: 'Baru — sudah bertugas', rows: newRows },
       { key: 'assigned', label: 'Bertugas', rows: assignedRows },
@@ -280,8 +290,8 @@ export function SenseiView() {
           </>
         }
       >
-        Master data Sensei. Label NEW / UNASSIGNED / CUTI dihitung otomatis. INACTIVE tetap tersimpan di
-        history.
+        Master data Sensei. Label NEW / UNASSIGNED / CUTI dihitung otomatis. Need Attention ditandai manual
+        oleh Kyouiku. INACTIVE tetap tersimpan di history.
       </PageIntro>
       <p className="text-xs text-ink-soft">
         {visible.filter((item) => item.primaryStatus === 'ACTIVE').length} aktif ·{' '}
@@ -354,6 +364,7 @@ export function SenseiView() {
                           ) : null}
                           {!linked ? <span className="text-[11px] text-ink-faint">belum login</span> : null}
                           {item.primaryStatus !== 'ACTIVE' ? <Badge tone="danger">INACTIVE</Badge> : null}
+                          {item.needsAttention ? <Badge tone="danger">NEED ATTENTION</Badge> : null}
                           {extraLabels.map((label) => (
                             <Badge key={label} tone={LABEL_TONE[label]}>
                               {label}
@@ -473,6 +484,22 @@ export function SenseiView() {
                     Kyouiku bisa mengubah level mengajar Sensei di sini. Data profil lain (nama, email, CUTI,
                     status, akun login) tetap hanya bisa diubah Super Admin.
                   </p>
+                </label>
+              ) : null}
+              {permissions.canFlagSenseiAttention && selected.primaryStatus === 'ACTIVE' ? (
+                <label className="mt-3 flex items-center gap-2 rounded-xl border border-line p-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.needsAttention}
+                    onChange={(e) => updateSenseiAttention(selected.id, e.target.checked)}
+                  />
+                  <span>
+                    <span className="ui-label block">Need Attention</span>
+                    <span className="text-xs text-ink-soft">
+                      Sensei aktif tier bawah yang compliance-nya perlu ditindaklanjuti. Ditandai manual oleh
+                      Kyouiku.
+                    </span>
+                  </span>
                 </label>
               ) : null}
             </>

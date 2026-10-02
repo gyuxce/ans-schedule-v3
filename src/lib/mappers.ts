@@ -43,6 +43,7 @@ export function mapSensei(row: Record<string, unknown>): Sensei {
     phone: String(row.no_wa || ''),
     levels,
     primaryStatus: 'ACTIVE',
+    needsAttention: false,
     joinDate: new Date().toISOString().slice(0, 10),
     timezone: normalizeTimezone(row.timezone ? String(row.timezone) : null),
     notes: row.note ? String(row.note) : undefined
@@ -54,6 +55,7 @@ export function mapSenseiWithStatus(sensei: Sensei, statusRow?: Record<string, u
   return {
     ...sensei,
     primaryStatus: (statusRow.primary_status as SenseiPrimaryStatus) || sensei.primaryStatus,
+    needsAttention: Boolean(statusRow.needs_attention),
     joinDate: statusRow.join_date ? String(statusRow.join_date) : sensei.joinDate,
     notes: sensei.notes
   };

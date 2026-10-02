@@ -41,7 +41,8 @@ const yuki: Sensei = {
   levels: ['N5'],
   primaryStatus: 'ACTIVE',
   joinDate: '2026-07-20',
-  timezone: 'Asia/Jakarta'
+  timezone: 'Asia/Jakarta',
+  needsAttention: false
 };
 
 const classOf = (
@@ -657,7 +658,8 @@ describe('resolveSenseiId', () => {
       levels: [],
       primaryStatus: 'ACTIVE',
       joinDate: '2026-01-01',
-      timezone: 'Asia/Jakarta'
+      timezone: 'Asia/Jakarta',
+      needsAttention: false
     }
   ];
 

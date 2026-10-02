@@ -504,6 +504,21 @@ export async function upsertSenseiTimezoneRemote(senseiId: string, timezone: Sen
   if (error) throw new Error(error.message);
 }
 
+/** Narrow write for Kyouiku — only ever touches needs_attention on
+ *  sensei_status, never routes through upsertSenseiStatusRemote (which
+ *  also writes primary_status/CUTI, Super-Admin-only). A plain UPDATE
+ *  (not upsert) so it never risks re-writing primary_status with a stale
+ *  client-side value. */
+export async function updateSenseiNeedsAttentionRemote(senseiId: string, needsAttention: boolean) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('sensei_status')
+    .update({ needs_attention: needsAttention })
+    .eq('sensei_id', senseiId);
+  if (error) throw new Error(error.message);
+}
+
 export async function upsertAppSettingsRemote(settings: AppSettings, updatedBy?: string) {
   const supabase = getSupabase();
   if (!supabase) return;
