@@ -7,6 +7,18 @@ import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 import { PageIntro } from './ui/PageIntro';
 
+const QA_SCORE_OPTIONS = [
+  { value: 3, label: 'Above Expectation' },
+  { value: 2, label: 'Meet Expectation' },
+  { value: 1, label: 'Below Expectation' }
+] as const;
+
+function qaScoreLabel(score: number) {
+  if (score >= 3) return 'Above Expectation';
+  if (score === 2) return 'Meet Expectation';
+  return 'Below Expectation';
+}
+
 export function QaView() {
   const permissions = usePermissions();
   const allSensei = useDashboardStore((state) => state.sensei);
@@ -17,7 +29,7 @@ export function QaView() {
   const month = new Date().toISOString().slice(0, 7);
   const [scoreForm, setScoreForm] = useState({
     senseiId: sensei[0]?.id ?? allSensei[0]?.id ?? '',
-    score: 85,
+    score: 2,
     notes: ''
   });
   const [reviewId, setReviewId] = useState<string | null>(null);
@@ -27,13 +39,16 @@ export function QaView() {
       report,
       session: schedules.find((item) => item.id === report.scheduleId)
     }))
-    .filter((item) => item.session);
+    .filter((item) => item.session)
+    .sort((a, b) =>
+      `${b.session!.date}T${b.session!.startTime}`.localeCompare(`${a.session!.date}T${a.session!.startTime}`)
+    );
 
   return (
     <div className="space-y-6">
       <PageIntro kicker="QA & Rekaman" title="QA & rekaman">
-        Teaching Performance diinput manual oleh Kyouiku (0–100). Rekaman disimpan sebagai referensi URL. Skor
-        komposit disiplin belum digabung di V3.
+        Teaching Performance dinilai manual oleh Kyouiku (Above/Meet/Below Expectation). Rekaman disimpan sebagai
+        referensi URL. Skor komposit disiplin belum digabung di V3.
       </PageIntro>
       <div className="grid gap-4 xl:grid-cols-2">
         <div className="ui-card overflow-hidden">
@@ -59,7 +74,7 @@ export function QaView() {
                     <tr key={item.id}>
                       <td className="text-ink">{displayName(allSensei, item.senseiId)}</td>
                       <td className="text-ink-soft">{item.month}</td>
-                      <td className="num font-semibold text-ink">{item.score}</td>
+                      <td className="num font-semibold text-ink">{qaScoreLabel(item.score)}</td>
                     </tr>
                   ))
                 )}
@@ -73,20 +88,25 @@ export function QaView() {
                 value={scoreForm.senseiId}
                 onChange={(event) => setScoreForm({ ...scoreForm, senseiId: event.target.value })}
               >
-                {(permissions.canViewAllSensei ? allSensei : sensei).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
+                {(permissions.canViewAllSensei ? allSensei : sensei)
+                  .filter((item) => item.primaryStatus === 'ACTIVE')
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+              </select>
+              <select
+                className="ui-select"
+                value={scoreForm.score}
+                onChange={(event) => setScoreForm({ ...scoreForm, score: Number(event.target.value) })}
+              >
+                {QA_SCORE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
-              <input
-                className="ui-input"
-                type="number"
-                min={0}
-                max={100}
-                value={scoreForm.score}
-                onChange={(event) => setScoreForm({ ...scoreForm, score: Number(event.target.value) })}
-              />
               <input
                 className="ui-input"
                 placeholder="Catatan QA"
@@ -113,7 +133,7 @@ export function QaView() {
               <div key={report.id} className="rounded-xl border border-line p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-semibold">
-                    {session?.level} · {session?.date}
+                    {session?.level} · {displayName(allSensei, session?.senseiId)} · {session?.date}
                   </div>
                   <Badge
                     tone={
@@ -127,7 +147,18 @@ export function QaView() {
                     {report.recordingStatus}
                   </Badge>
                 </div>
-                <p className="text-xs text-ink-soft">{report.recordingUrl || 'Belum ada URL'}</p>
+                {report.recordingUrl ? (
+                  <a
+                    className="break-all text-xs font-semibold text-accent underline"
+                    href={report.recordingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {report.recordingUrl}
+                  </a>
+                ) : (
+                  <p className="text-xs text-ink-soft">Belum ada URL</p>
+                )}
                 <div className="mt-1 flex items-center justify-between">
                   <Badge tone={report.qaReviewStatus === 'Reviewed' ? 'pine' : 'gold'}>
                     {report.qaReviewStatus}
