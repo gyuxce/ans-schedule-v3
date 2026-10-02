@@ -60,6 +60,10 @@ export interface Sensei {
   phone: string;
   levels: string[];
   primaryStatus: SenseiPrimaryStatus;
+  /** Manually flagged by Kyouiku: an ACTIVE Sensei whose compliance
+   *  (QA/reporting/attendance habits) is below bar and needs follow-up.
+   *  Independent of primaryStatus — Super Admin only changes that. */
+  needsAttention: boolean;
   joinDate: string;
   timezone: SenseiTimezone;
   notes?: string;
@@ -297,6 +301,9 @@ export interface Permissions {
   /** Super Admin + Kyouiku: edit a Sensei's "Level mengajar" (JLPT levels taught) only —
    *  narrower than canManageUsers, which also covers profile/CUTI/status/login/delete. */
   canEditSenseiLevels: boolean;
+  /** Super Admin + Kyouiku: toggle a Sensei's "Need Attention" compliance flag only —
+   *  narrower than canManageUsers; does not grant primaryStatus/CUTI/profile edits. */
+  canFlagSenseiAttention: boolean;
 }
 
 export interface WorkloadMetrics {

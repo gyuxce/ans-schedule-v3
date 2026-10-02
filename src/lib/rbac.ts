@@ -21,7 +21,8 @@ export function getPermissions(role: AppRole): Permissions {
       canViewAudit: true,
       canViewAllSensei: true,
       canExportEomReport: true,
-      canEditSenseiLevels: true
+      canEditSenseiLevels: true,
+      canFlagSenseiAttention: true
     };
   }
 
@@ -45,7 +46,8 @@ export function getPermissions(role: AppRole): Permissions {
       canViewAudit: true,
       canViewAllSensei: true,
       canExportEomReport: false,
-      canEditSenseiLevels: true
+      canEditSenseiLevels: true,
+      canFlagSenseiAttention: true
     };
   }
 
@@ -68,6 +70,7 @@ export function getPermissions(role: AppRole): Permissions {
     canViewAudit: false,
     canViewAllSensei: false,
     canExportEomReport: false,
-    canEditSenseiLevels: false
+    canEditSenseiLevels: false,
+    canFlagSenseiAttention: false
   };
 }
