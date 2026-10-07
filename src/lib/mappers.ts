@@ -44,6 +44,8 @@ export function mapSensei(row: Record<string, unknown>): Sensei {
     levels,
     primaryStatus: 'ACTIVE',
     needsAttention: false,
+    canTeachEnglish: Boolean(row.can_teach_english),
+    canTeachKids: Boolean(row.can_teach_kids),
     joinDate: new Date().toISOString().slice(0, 10),
     timezone: normalizeTimezone(row.timezone ? String(row.timezone) : null),
     notes: row.note ? String(row.note) : undefined

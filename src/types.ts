@@ -64,6 +64,10 @@ export interface Sensei {
    *  (QA/reporting/attendance habits) is below bar and needs follow-up.
    *  Independent of primaryStatus — Super Admin only changes that. */
   needsAttention: boolean;
+  /** Set by Kyouiku/Ops when the Sensei account is first created, so it's
+   *  quickly visible in Ketersediaan without opening the Sensei page. */
+  canTeachEnglish: boolean;
+  canTeachKids: boolean;
   joinDate: string;
   timezone: SenseiTimezone;
   notes?: string;

@@ -497,6 +497,21 @@ export async function updateSenseiLevelsRemote(senseiId: string, levels: string[
   if (error) throw new Error(error.message);
 }
 
+/** Narrow write for Kyouiku/Ops — only ever touches can_teach_english and
+ *  can_teach_kids, same reasoning as updateSenseiLevelsRemote above. */
+export async function updateSenseiCapabilitiesRemote(
+  senseiId: string,
+  capabilities: { canTeachEnglish: boolean; canTeachKids: boolean }
+) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('sensei')
+    .update({ can_teach_english: capabilities.canTeachEnglish, can_teach_kids: capabilities.canTeachKids })
+    .eq('id', senseiId);
+  if (error) throw new Error(error.message);
+}
+
 export async function upsertSenseiTimezoneRemote(senseiId: string, timezone: SenseiTimezone) {
   const supabase = getSupabase();
   if (!supabase) return;

@@ -42,7 +42,9 @@ const yuki: Sensei = {
   primaryStatus: 'ACTIVE',
   joinDate: '2026-07-20',
   timezone: 'Asia/Jakarta',
-  needsAttention: false
+  needsAttention: false,
+  canTeachEnglish: false,
+  canTeachKids: false
 };
 
 const classOf = (
@@ -659,7 +661,9 @@ describe('resolveSenseiId', () => {
       primaryStatus: 'ACTIVE',
       joinDate: '2026-01-01',
       timezone: 'Asia/Jakarta',
-      needsAttention: false
+      needsAttention: false,
+      canTeachEnglish: false,
+      canTeachKids: false
     }
   ];
 

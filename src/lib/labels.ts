@@ -62,3 +62,15 @@ export function statusTone(status: SenseiPrimaryStatus) {
 export function senseiDisplayName(sensei: Pick<Sensei, 'name' | 'displayName'>) {
   return sensei.displayName?.trim() || sensei.name;
 }
+
+const JLPT_ORDER = ['N1', 'N2', 'N3', 'N4', 'N5'];
+/** Pull out any JLPT tokens (N1–N5) from the free-form "Level mengajar" list,
+ *  highest level first, so it's scannable at a glance in the roster. */
+export function jlptLevels(levels: string[]) {
+  const found = new Set<string>();
+  for (const level of levels) {
+    const match = level.toUpperCase().match(/\bN[1-5]\b/);
+    if (match) found.add(match[0]);
+  }
+  return JLPT_ORDER.filter((level) => found.has(level));
+}
