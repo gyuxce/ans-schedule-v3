@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { CLASS_LEVELS } from '../constants';
-import { getOperationalLabels, senseiDisplayName } from '../lib/labels';
+import { getOperationalLabels, jlptLevels, senseiDisplayName } from '../lib/labels';
 import { timezoneAbbreviation, timezoneLabel, SENSEI_TIMEZONE_OPTIONS } from '../lib/timezone';
 import { formatHours, formatPercent, getWorkloadMetrics } from '../lib/workload';
 import { useDashboardStore, usePermissions } from '../store/useDashboardStore';
@@ -24,18 +24,6 @@ const LABEL_TONE = {
   CUTI: 'sky'
 } as const;
 
-const JLPT_ORDER = ['N1', 'N2', 'N3', 'N4', 'N5'];
-/** Pull out any JLPT tokens (N1–N5) from the free-form "Level mengajar" list,
- *  highest level first, so it's scannable at a glance in the roster. */
-function jlptLevels(levels: string[]) {
-  const found = new Set<string>();
-  for (const level of levels) {
-    const match = level.toUpperCase().match(/\bN[1-5]\b/);
-    if (match) found.add(match[0]);
-  }
-  return JLPT_ORDER.filter((level) => found.has(level));
-}
-
 const emptyForm = (): Omit<Sensei, 'id'> => ({
   name: '',
   displayName: '',
@@ -46,7 +34,9 @@ const emptyForm = (): Omit<Sensei, 'id'> => ({
   joinDate: new Date().toISOString().slice(0, 10),
   timezone: 'Asia/Jakarta',
   notes: '',
-  needsAttention: false
+  needsAttention: false,
+  canTeachEnglish: false,
+  canTeachKids: false
 });
 
 export function SenseiView() {
@@ -65,6 +55,7 @@ export function SenseiView() {
   const upsertSensei = useDashboardStore((state) => state.upsertSensei);
   const updateSenseiLevels = useDashboardStore((state) => state.updateSenseiLevels);
   const updateSenseiAttention = useDashboardStore((state) => state.updateSenseiAttention);
+  const updateSenseiCapabilities = useDashboardStore((state) => state.updateSenseiCapabilities);
   const setSenseiLeave = useDashboardStore((state) => state.setSenseiLeave);
   const createUserLogin = useDashboardStore((state) => state.createUserLogin);
   const currentUser = useDashboardStore((state) => state.currentUser);
@@ -83,7 +74,9 @@ export function SenseiView() {
   const [loginPassword2, setLoginPassword2] = useState('');
   const [creatingLogin, setCreatingLogin] = useState(false);
   const [detailMode, setDetailMode] = useState<'view' | 'edit'>('view');
-  const [filter, setFilter] = useState<'all' | 'unassigned' | 'new' | 'below_target'>('all');
+  const [filter, setFilter] = useState<
+    'all' | 'unassigned' | 'new' | 'below_target' | 'n2' | 'n3' | 'english'
+  >('all');
   const [levelsDraft, setLevelsDraft] = useState('');
   const [savingLevels, setSavingLevels] = useState(false);
   const selected = visible.find((item) => item.id === selectedId);
@@ -125,7 +118,9 @@ export function SenseiView() {
       joinDate: item.joinDate,
       timezone: item.timezone,
       notes: item.notes || '',
-      needsAttention: item.needsAttention
+      needsAttention: item.needsAttention,
+      canTeachEnglish: item.canTeachEnglish,
+      canTeachKids: item.canTeachKids
     });
     const leave = leavePeriods.find((row) => row.senseiId === item.id && row.status === 'approved');
     setLeaveStart(leave?.startDate || '');
@@ -225,6 +220,9 @@ export function SenseiView() {
       if (filter === 'new') return labels.includes('NEW');
       if (filter === 'below_target')
         return item.primaryStatus === 'ACTIVE' && workload.assignedHours < workload.targetHours;
+      if (filter === 'n2') return jlptLevels(item.levels).includes('N2');
+      if (filter === 'n3') return jlptLevels(item.levels).includes('N3');
+      if (filter === 'english') return item.canTeachEnglish;
       return true;
     });
     return filtered.sort((a, b) => {
@@ -318,7 +316,22 @@ export function SenseiView() {
               getOperationalLabels(item, schedules, leavePeriods, new Date(), classMasters).includes('NEW')
             ).length
           },
-          { id: 'below_target', label: `Di bawah ${weeklyHourTarget} jam` }
+          { id: 'below_target', label: `Di bawah ${weeklyHourTarget} jam` },
+          {
+            id: 'n2',
+            label: 'N2',
+            count: visible.filter((item) => jlptLevels(item.levels).includes('N2')).length
+          },
+          {
+            id: 'n3',
+            label: 'N3',
+            count: visible.filter((item) => jlptLevels(item.levels).includes('N3')).length
+          },
+          {
+            id: 'english',
+            label: 'Bisa Inggris',
+            count: visible.filter((item) => item.canTeachEnglish).length
+          }
         ]}
       />
       <div className="ui-card overflow-hidden">
@@ -501,6 +514,43 @@ export function SenseiView() {
                     </span>
                   </span>
                 </label>
+              ) : null}
+              {permissions.canEditSenseiLevels ? (
+                <div className="mt-3 rounded-xl border border-line p-3">
+                  <span className="ui-label block">Kemampuan mengajar</span>
+                  <span className="text-xs text-ink-soft">
+                    Diisi Kyouiku/Ops saat Sensei pertama kali dibuatkan akun, supaya kelihatan cepat di
+                    Ketersediaan tanpa buka halaman ini.
+                  </span>
+                  <div className="mt-2 flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selected.canTeachEnglish}
+                        onChange={(e) =>
+                          updateSenseiCapabilities(selected.id, {
+                            canTeachEnglish: e.target.checked,
+                            canTeachKids: selected.canTeachKids
+                          })
+                        }
+                      />
+                      Bisa Inggris
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selected.canTeachKids}
+                        onChange={(e) =>
+                          updateSenseiCapabilities(selected.id, {
+                            canTeachEnglish: selected.canTeachEnglish,
+                            canTeachKids: e.target.checked
+                          })
+                        }
+                      />
+                      Bisa Kids
+                    </label>
+                  </div>
+                </div>
               ) : null}
             </>
           ) : canEditOps ? (

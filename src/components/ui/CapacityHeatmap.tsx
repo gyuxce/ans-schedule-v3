@@ -1,9 +1,11 @@
 import { format } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import { compactTimeRange, isToday, toDateKey, weekdayOf } from '../../lib/dates';
+import { jlptLevels } from '../../lib/labels';
 import { formatHoursShort, getDayCapacity } from '../../lib/workload';
 import type { AvailabilitySlot, ClassSession } from '../../types';
 import { Avatar } from './Avatar';
+import { Badge } from './Badge';
 
 export function CapacityHeatmap({
   sensei,
@@ -14,7 +16,13 @@ export function CapacityHeatmap({
   onAddDay,
   onDisableSlot
 }: {
-  sensei: Array<{ id: string; name: string }>;
+  sensei: Array<{
+    id: string;
+    name: string;
+    levels: string[];
+    canTeachEnglish: boolean;
+    canTeachKids: boolean;
+  }>;
   days: Date[];
   availability: AvailabilitySlot[];
   schedules: ClassSession[];
@@ -76,6 +84,17 @@ export function CapacityHeatmap({
                       ? `${formatHoursShort(weekAssigned)} / ${formatHoursShort(weekAvailable)} · sisa ${formatHoursShort(remaining)}`
                       : 'Belum buka slot'}
                   </div>
+                  {jlptLevels(item.levels).length || item.canTeachEnglish || item.canTeachKids ? (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {jlptLevels(item.levels).map((level) => (
+                        <Badge key={level} tone="muted">
+                          {level}
+                        </Badge>
+                      ))}
+                      {item.canTeachEnglish ? <Badge tone="sky">EN</Badge> : null}
+                      {item.canTeachKids ? <Badge tone="sky">Kids</Badge> : null}
+                    </div>
+                  ) : null}
                 </div>
               </div>
               {days.map((day) => {

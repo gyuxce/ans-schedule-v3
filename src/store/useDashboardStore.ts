@@ -29,6 +29,7 @@ import {
   upsertSenseiRemote,
   updateSenseiLevelsRemote,
   updateSenseiNeedsAttentionRemote,
+  updateSenseiCapabilitiesRemote,
   upsertSessionLogRemote,
   upsertEnrollmentRemote,
   upsertSessionReportRemote,
@@ -189,6 +190,10 @@ interface DashboardStore extends DashboardSnapshot {
   updateSenseiTimezone: (senseiId: string, timezone: SenseiTimezone) => void;
   updateSenseiLevels: (senseiId: string, levels: string[]) => void;
   updateSenseiAttention: (senseiId: string, needsAttention: boolean) => void;
+  updateSenseiCapabilities: (
+    senseiId: string,
+    capabilities: { canTeachEnglish: boolean; canTeachKids: boolean }
+  ) => void;
   upsertSensei: (input: Omit<Sensei, 'id'> & { id?: string }) => string | null;
   setSenseiLeave: (
     senseiId: string,
@@ -1154,6 +1159,30 @@ export const useDashboardStore = create<DashboardStore>()(
         });
         void safeRemote(() => updateSenseiNeedsAttentionRemote(senseiId, needsAttention), 'Simpan status Need Attention');
         toast.success(needsAttention ? 'Sensei ditandai Need Attention' : 'Tanda Need Attention dihapus');
+      },
+      updateSenseiCapabilities: (senseiId, capabilities) => {
+        const state = get();
+        if (!getPermissions(state.currentUser?.role ?? 'Sensei').canEditSenseiLevels) {
+          toast.error('Tidak punya izin mengubah kemampuan mengajar Sensei');
+          return;
+        }
+        const existing = state.sensei.find((item) => item.id === senseiId);
+        if (!existing) return;
+        set((current) => {
+          pushAudit(current, {
+            action: 'update_sensei_capabilities',
+            entity: 'sensei',
+            recordId: senseiId,
+            oldValue: { canTeachEnglish: existing.canTeachEnglish, canTeachKids: existing.canTeachKids },
+            newValue: capabilities
+          });
+          return {
+            sensei: current.sensei.map((item) => (item.id === senseiId ? { ...item, ...capabilities } : item)),
+            auditLogs: current.auditLogs
+          };
+        });
+        void safeRemote(() => updateSenseiCapabilitiesRemote(senseiId, capabilities), 'Simpan kemampuan mengajar');
+        toast.success('Kemampuan mengajar disimpan');
       },
       upsertSensei: (input) => {
         if (!input.name.trim()) {
