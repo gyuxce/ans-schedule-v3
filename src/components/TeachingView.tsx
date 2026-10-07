@@ -249,7 +249,14 @@ export function TeachingView() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <FilterChips
           value={rangeMode}
-          onChange={setRangeMode}
+          onChange={(mode) => {
+            setRangeMode(mode);
+            // "Minggu ini" here must mean the current week, not whatever week
+            // weekAnchor happens to hold — weekAnchor is shared across pages,
+            // so it can still be pointed at a week the user navigated to
+            // earlier via WeekNav on this or another page.
+            if (mode === 'week') setWeekAnchor(toDateKey(new Date()));
+          }}
           options={[
             { id: 'week', label: 'Minggu ini' },
             { id: 'upcoming', label: 'Hari ini & ke depan' },
@@ -276,7 +283,7 @@ export function TeachingView() {
           >
             <option value="all">Semua Sensei</option>
             {(permissions.canViewAllSchedules
-              ? allSensei
+              ? allSensei.filter((item) => item.primaryStatus === 'ACTIVE')
               : allSensei.filter((item) => item.id === linkedSenseiId)
             ).map((item) => (
               <option key={item.id} value={item.id}>

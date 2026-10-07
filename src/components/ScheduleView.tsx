@@ -294,11 +294,13 @@ export function ScheduleView() {
               onChange={(event) => setSenseiFilter(event.target.value)}
             >
               <option value="all">Semua Sensei</option>
-              {allSensei.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
+              {allSensei
+                .filter((item) => item.primaryStatus === 'ACTIVE')
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
             </select>
             <WeekNav weekAnchor={weekAnchor} onChange={setWeekAnchor} />
             {permissions.canEditOfficialSchedule ? (
