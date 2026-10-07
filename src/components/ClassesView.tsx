@@ -280,6 +280,7 @@ export function ClassesView() {
         <div className="space-y-1.5">
           {visible.map(({ item, progress, health }) => {
             const senseiName = displayName(allSensei, item.senseiId);
+            const overTarget = progress.calendarCount > progress.required;
             return (
               <button
                 key={item.id}
@@ -295,6 +296,7 @@ export function ClassesView() {
                   <div className="flex items-center gap-1.5">
                     <span className="truncate text-sm font-semibold text-ink">{item.displayName}</span>
                     <Badge tone={TYPE_TONE[item.type]}>{item.type}</Badge>
+                    {overTarget ? <Badge tone="gold">LEWAT TARGET</Badge> : null}
                   </div>
                   <p className="truncate text-[11px] text-ink-soft">
                     {item.level} · {senseiName} · {item.studentIds.length} siswa
@@ -376,10 +378,12 @@ export function ClassesView() {
                       <span className="font-semibold text-ink">
                         {progress.completed}/{progress.required} sesi selesai
                       </span>
-                      <span className="text-ink-soft">
+                      <span className={progress.calendarCount > progress.required ? 'font-semibold text-warn' : 'text-ink-soft'}>
                         {progress.calendarCount === 0
                           ? 'belum generate'
-                          : `${progress.calendarCount} di kalender`}
+                          : progress.calendarCount > progress.required
+                            ? `${progress.calendarCount} di kalender — lewat target ${progress.required}`
+                            : `${progress.calendarCount} di kalender`}
                       </span>
                     </div>
                     <Meter
@@ -581,6 +585,12 @@ export function ClassesView() {
                       </option>
                     ))}
                   </select>
+                  <p className="mt-1 text-xs text-ink-soft">
+                    <b>Completed</b> di sini = status Class Master, menandai seluruh keterlibatan kelas ini
+                    sudah tuntas (beda dari status "Selesai" di satu sesi harian). Tandai kelas yang sudah
+                    lama tidak ada jadwal baru sebagai Completed, bukan dibiarkan Active, supaya sensei-nya
+                    otomatis muncul lagi sebagai UNASSIGNED kalau memang sudah tidak ada kelas berjalan.
+                  </p>
                 </label>
                 <label>
                   <span className="ui-label">Required meetings</span>
@@ -591,6 +601,12 @@ export function ClassesView() {
                     value={form.requiredMeetings}
                     onChange={(e) => setForm({ ...form, requiredMeetings: Number(e.target.value) })}
                   />
+                  {editing && editingCalendarCount > form.requiredMeetings ? (
+                    <p className="mt-1 text-xs font-semibold text-warn">
+                      Sudah ada {editingCalendarCount} sesi di kalender, lewat target ini. Kalau kelas
+                      memang diperpanjang, update target biar tampilan "Sesi ke-N" tidak membingungkan.
+                    </p>
+                  ) : null}
                 </label>
                 <label>
                   <span className="ui-label">Durasi sesi (menit)</span>
