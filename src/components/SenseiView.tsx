@@ -75,7 +75,7 @@ export function SenseiView() {
   const [creatingLogin, setCreatingLogin] = useState(false);
   const [detailMode, setDetailMode] = useState<'view' | 'edit'>('view');
   const [filter, setFilter] = useState<
-    'all' | 'unassigned' | 'new' | 'below_target' | 'n2' | 'n3' | 'english'
+    'all' | 'unassigned' | 'new' | 'below_target' | 'n2' | 'n3' | 'english' | 'kids'
   >('all');
   const [levelsDraft, setLevelsDraft] = useState('');
   const [savingLevels, setSavingLevels] = useState(false);
@@ -220,9 +220,13 @@ export function SenseiView() {
       if (filter === 'new') return labels.includes('NEW');
       if (filter === 'below_target')
         return item.primaryStatus === 'ACTIVE' && workload.assignedHours < workload.targetHours;
-      if (filter === 'n2') return jlptLevels(item.levels).includes('N2');
-      if (filter === 'n3') return jlptLevels(item.levels).includes('N3');
-      if (filter === 'english') return item.canTeachEnglish;
+      // Capability counts (JLPT level, English, Kids) only make sense for
+      // Sensei actually available to teach, so INACTIVE is excluded here —
+      // same principle the team asked for on N2/N3, applied consistently.
+      if (filter === 'n2') return item.primaryStatus === 'ACTIVE' && jlptLevels(item.levels).includes('N2');
+      if (filter === 'n3') return item.primaryStatus === 'ACTIVE' && jlptLevels(item.levels).includes('N3');
+      if (filter === 'english') return item.primaryStatus === 'ACTIVE' && item.canTeachEnglish;
+      if (filter === 'kids') return item.primaryStatus === 'ACTIVE' && item.canTeachKids;
       return true;
     });
     return filtered.sort((a, b) => {
@@ -320,17 +324,26 @@ export function SenseiView() {
           {
             id: 'n2',
             label: 'N2',
-            count: visible.filter((item) => jlptLevels(item.levels).includes('N2')).length
+            count: visible.filter(
+              (item) => item.primaryStatus === 'ACTIVE' && jlptLevels(item.levels).includes('N2')
+            ).length
           },
           {
             id: 'n3',
             label: 'N3',
-            count: visible.filter((item) => jlptLevels(item.levels).includes('N3')).length
+            count: visible.filter(
+              (item) => item.primaryStatus === 'ACTIVE' && jlptLevels(item.levels).includes('N3')
+            ).length
           },
           {
             id: 'english',
             label: 'Bisa Inggris',
-            count: visible.filter((item) => item.canTeachEnglish).length
+            count: visible.filter((item) => item.primaryStatus === 'ACTIVE' && item.canTeachEnglish).length
+          },
+          {
+            id: 'kids',
+            label: 'Bisa Kids',
+            count: visible.filter((item) => item.primaryStatus === 'ACTIVE' && item.canTeachKids).length
           }
         ]}
       />
