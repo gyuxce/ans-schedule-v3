@@ -383,6 +383,8 @@ export function SenseiView() {
                               {level}
                             </Badge>
                           ))}
+                          {item.canTeachEnglish ? <Badge tone="sky">EN</Badge> : null}
+                          {item.canTeachKids ? <Badge tone="sky">Kids</Badge> : null}
                           {timezoneAbbreviation(item.timezone) !== 'WIB' ? (
                             <span className="text-[11px] font-medium text-ink-soft">
                               {timezoneAbbreviation(item.timezone)}
