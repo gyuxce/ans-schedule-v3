@@ -16,6 +16,7 @@ import { Meter } from './ui/Meter';
 import { Modal } from './ui/Modal';
 import { PageIntro } from './ui/PageIntro';
 import { StudentPicker } from './ui/StudentPicker';
+import { TakeOverPanel } from './ui/TakeOverPanel';
 
 type ClassFilter = 'all' | 'attention' | 'on_track' | 'idle' | 'done';
 
@@ -485,34 +486,41 @@ export function ClassesView() {
           }
         >
           {editing && detailMode === 'view' ? (
-            <DetailFields
-              items={[
-                { label: 'Nama tampilan', value: form.displayName },
-                { label: 'Kode kelas', value: form.code || '—' },
-                { label: 'Tipe', value: form.type },
-                { label: 'Level', value: form.level },
-                { label: 'Sensei', value: displayName(allSensei, form.senseiId) },
-                {
-                  label: 'Status',
-                  value:
-                    CLASS_MASTER_STATUSES.find((item) => item.value === form.status)?.label || form.status
-                },
-                { label: 'Required meetings', value: String(form.requiredMeetings) },
-                { label: 'Durasi sesi', value: `${form.sessionDurationMinutes} menit` },
-                { label: 'Start date', value: form.startDate || '—' },
-                { label: 'Planned end', value: form.plannedEndDate || '—' },
-                {
-                  label: 'Siswa',
-                  value: form.studentIds.map((id) => displayName(allStudents, id)).join(', ') || '—',
-                  full: true
-                },
-                { label: 'Progres kelas', value: form.meetLink || '—', full: true },
-                { label: 'Classroom', value: form.classroomLink || '—', full: true },
-                { label: 'Chat', value: form.chatLink || '—', full: true },
-                { label: 'Material', value: form.materialLink || '—', full: true },
-                { label: 'Catatan mengajar', value: form.teachingNotes || '—', full: true }
-              ]}
-            />
+            <>
+              <DetailFields
+                items={[
+                  { label: 'Nama tampilan', value: form.displayName },
+                  { label: 'Kode kelas', value: form.code || '—' },
+                  { label: 'Tipe', value: form.type },
+                  { label: 'Level', value: form.level },
+                  { label: 'Sensei', value: displayName(allSensei, form.senseiId) },
+                  {
+                    label: 'Status',
+                    value:
+                      CLASS_MASTER_STATUSES.find((item) => item.value === form.status)?.label || form.status
+                  },
+                  { label: 'Required meetings', value: String(form.requiredMeetings) },
+                  { label: 'Durasi sesi', value: `${form.sessionDurationMinutes} menit` },
+                  { label: 'Start date', value: form.startDate || '—' },
+                  { label: 'Planned end', value: form.plannedEndDate || '—' },
+                  {
+                    label: 'Siswa',
+                    value: form.studentIds.map((id) => displayName(allStudents, id)).join(', ') || '—',
+                    full: true
+                  },
+                  { label: 'Progres kelas', value: form.meetLink || '—', full: true },
+                  { label: 'Classroom', value: form.classroomLink || '—', full: true },
+                  { label: 'Chat', value: form.chatLink || '—', full: true },
+                  { label: 'Material', value: form.materialLink || '—', full: true },
+                  { label: 'Catatan mengajar', value: form.teachingNotes || '—', full: true }
+                ]}
+              />
+              <TakeOverPanel
+                classIds={[editing.id]}
+                fromSenseiId={editing.senseiId}
+                onDone={() => setEditing(null)}
+              />
+            </>
           ) : (
             <>
               <div className="grid gap-3 md:grid-cols-2">

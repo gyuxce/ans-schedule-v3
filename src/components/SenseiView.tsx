@@ -16,6 +16,7 @@ import { Meter } from './ui/Meter';
 import { Modal } from './ui/Modal';
 import { PageIntro } from './ui/PageIntro';
 import { PasswordField } from './ui/PasswordField';
+import { TakeOverPanel } from './ui/TakeOverPanel';
 import { WeekNav } from './ui/WeekNav';
 
 const LABEL_TONE = {
@@ -514,6 +515,19 @@ export function SenseiView() {
                   </p>
                 </label>
               ) : null}
+              <div className="mt-3">
+                <TakeOverPanel
+                  classIds={classMasters
+                    .filter(
+                      (item) =>
+                        item.senseiId === selected.id &&
+                        item.status !== 'completed' &&
+                        item.status !== 'cancelled'
+                    )
+                    .map((item) => item.id)}
+                  fromSenseiId={selected.id}
+                />
+              </div>
               {permissions.canFlagSenseiAttention && selected.primaryStatus === 'ACTIVE' ? (
                 <label className="mt-3 flex items-center gap-2 rounded-xl border border-line p-3">
                   <input

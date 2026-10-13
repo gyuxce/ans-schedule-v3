@@ -67,7 +67,7 @@ export function StudentsView() {
   const upsertStudent = useDashboardStore((state) => state.upsertStudent);
   const deleteStudent = useDashboardStore((state) => state.deleteStudent);
   const upsertEnrollment = useDashboardStore((state) => state.upsertEnrollment);
-  const { students, sessionReports, schedules } = useScopedData();
+  const { students, classReports: sessionReports, classSchedules: schedules } = useScopedData();
   const canManage = permissions.canManageUsers;
   const [selectedId, setSelectedId] = useState(students[0]?.id ?? '');
   const selected = students.find((item) => item.id === selectedId) ?? students[0];

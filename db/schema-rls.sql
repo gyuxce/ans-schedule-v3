@@ -614,6 +614,79 @@ CREATE POLICY v3_enrollments_write
   USING ((SELECT public.is_kyouiku_or_ops())) WITH CHECK ((SELECT public.is_kyouiku_or_ops()));
 
 -- =========================================================
+-- CLASS HISTORY (Sensei pengganti membaca riwayat kelas yang ia ajar)
+-- Sama dengan schema-fix-class-history-visibility.sql; dimasukkan ke sini
+-- supaya tidak hilang saat file ini dijalankan ulang (blok DROP v3_% di atas).
+-- =========================================================
+
+-- "Am I assigned (currently) to at least one session of this class?"
+CREATE OR REPLACE FUNCTION public.teaches_class(p_class_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT p_class_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM schedules sch
+    WHERE sch.class_id = p_class_id
+      AND sch.sensei_id = public.current_sensei_id()
+  )
+$$;
+
+CREATE OR REPLACE FUNCTION public.teaches_schedule_class(p_schedule_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM schedules sch
+    WHERE sch.id = p_schedule_id
+      AND public.teaches_class(sch.class_id)
+  )
+$$;
+
+CREATE OR REPLACE FUNCTION public.teaches_student(p_student_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM class_masters cm
+    WHERE public.teaches_class(cm.id)
+      AND cm.student_ids ? p_student_id::text
+  )
+$$;
+
+CREATE POLICY v3_schedules_select_class_history
+  ON schedules FOR SELECT TO authenticated
+  USING (public.teaches_class(class_id));
+
+CREATE POLICY v3_session_reports_select_class_history
+  ON session_reports FOR SELECT TO authenticated
+  USING (public.teaches_schedule_class(schedule_id));
+
+CREATE POLICY v3_session_student_records_select_class_history
+  ON session_student_records FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM session_reports sr
+      WHERE sr.id = session_student_records.session_report_id
+        AND public.teaches_schedule_class(sr.schedule_id)
+    )
+  );
+
+CREATE POLICY v3_class_masters_select_class_history
+  ON class_masters FOR SELECT TO authenticated
+  USING (public.teaches_class(id));
+
+CREATE POLICY v3_students_select_class_history
+  ON students FOR SELECT TO authenticated
+  USING (public.teaches_student(id));
+
+CREATE POLICY v3_enrollments_select_class_history
+  ON enrollments FOR SELECT TO authenticated
+  USING (public.teaches_class(class_id));
+
+-- =========================================================
 -- STATEMENT TIMEOUT (jaring pengaman; berlaku untuk koneksi baru)
 -- =========================================================
 

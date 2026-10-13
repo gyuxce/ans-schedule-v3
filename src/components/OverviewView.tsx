@@ -85,6 +85,8 @@ export function OverviewView() {
     availability,
     sessionLogs,
     sessionReports,
+    classSchedules,
+    classReports,
     classMasters,
     linkedSenseiId
   } = useScopedData();
@@ -146,12 +148,12 @@ export function OverviewView() {
         if (!student) return false;
       }
       return (
-        deriveEnrollmentDisplayStatus(enrollment, schedules, sessionReports) === 'ending_soon' ||
+        deriveEnrollmentDisplayStatus(enrollment, classSchedules, classReports) === 'ending_soon' ||
         enrollment.status === 'ending_soon'
       );
     }).length;
     const endingSoonClasses = classMasters.filter(
-      (item) => getClassHealth(item, schedules, sessionReports).status === 'ending_soon'
+      (item) => getClassHealth(item, classSchedules, classReports).status === 'ending_soon'
     ).length;
     const avgUtil =
       activeSensei.reduce((sum, item) => {
@@ -176,7 +178,8 @@ export function OverviewView() {
     weekKeys,
     enrollments,
     permissions.canViewAllSchedules,
-    sessionReports,
+    classSchedules,
+    classReports,
     availability,
     weekAnchor
   ]);
