@@ -915,7 +915,9 @@ export function ScheduleView() {
                 />
               </div>
               <label>
-                <span className="ui-label">Alasan perubahan (audit)</span>
+                <span className="ui-label">
+                  Alasan perubahan (audit) <span className="text-danger">*</span>
+                </span>
                 <input
                   className="ui-input"
                   value={sessionForm.reason}
@@ -930,7 +932,9 @@ export function ScheduleView() {
               {editing && permissions.canAssignSensei && editing.status !== 'cancelled' ? (
                 <div className="grid gap-3 rounded-xl border border-line p-3 md:grid-cols-2">
                   <div>
-                    <p className="ui-label">Tukar Sensei</p>
+                    <p className="ui-label">
+                      Tukar Sensei <span className="text-danger">*</span>
+                    </p>
                     <select
                       className="ui-select"
                       value={swapTo}
@@ -969,7 +973,9 @@ export function ScheduleView() {
                     </Button>
                   </div>
                   <div>
-                    <p className="ui-label">Batalkan kelas</p>
+                    <p className="ui-label">
+                      Batalkan kelas <span className="text-danger">*</span>
+                    </p>
                     <input
                       className="ui-input"
                       value={cancelReason}
