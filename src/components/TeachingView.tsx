@@ -445,8 +445,23 @@ function SessionDrawer(props: {
 }) {
   const classMasters = useDashboardStore((state) => state.classMasters);
   const schedules = useDashboardStore((state) => state.schedules);
+  const allSensei = useDashboardStore((state) => state.sensei);
+  const { classReports } = useScopedData();
   const teachingClass = classMasters.find((item) => item.id === props.session.classId);
   const ordinal = getSessionOrdinal(props.session, schedules, teachingClass);
+  const previousMaterials = useMemo(() => {
+    const classId = props.session.classId;
+    if (!classId) return [];
+    return classReports
+      .flatMap((report) => {
+        const past = schedules.find((item) => item.id === report.scheduleId);
+        if (!past || past.classId !== classId || past.id === props.session.id) return [];
+        if (past.date > props.session.date) return [];
+        return [{ report, past }];
+      })
+      .sort((a, b) => b.past.date.localeCompare(a.past.date))
+      .slice(0, 5);
+  }, [classReports, schedules, props.session.classId, props.session.id, props.session.date]);
   const scheduled = scheduledDurationMinutes(props.session);
   const actual = actualDurationMinutes(props.log);
   const variance = durationVarianceMinutes(props.session, props.log);
@@ -485,6 +500,24 @@ function SessionDrawer(props: {
         {props.log?.lateJoin ? <Badge tone="danger">Late join</Badge> : null}
         {props.log?.overridden ? <Badge tone="gold">Clock override</Badge> : null}
       </div>
+      {previousMaterials.length > 0 ? (
+        <div className="rounded-xl border border-line p-3 text-sm">
+          <p className="ui-label">Materi sebelumnya (maks. 5 sesi terakhir)</p>
+          <ul className="mt-2 space-y-2">
+            {previousMaterials.map(({ report, past }) => (
+              <li key={report.id} className="rounded-lg bg-surface-2 px-3 py-2">
+                <p className="text-xs text-ink-soft">
+                  {past.date} · {displayName(allSensei, past.senseiId)}
+                </p>
+                <p className="font-medium text-ink">{report.materialCovered || '—'}</p>
+                {report.levelProgress ? (
+                  <p className="text-xs text-ink-soft">Progres level: {report.levelProgress}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className="grid gap-2 rounded-xl border border-line p-3 text-sm md:grid-cols-3">
         <div>
           <p className="ui-label">Durasi jadwal</p>

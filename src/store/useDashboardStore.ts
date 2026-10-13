@@ -12,6 +12,8 @@ import { hasActiveOrCompletedMakeup } from '../lib/makeup';
 import { createAuthLogin } from '../lib/createAuthLogin';
 import { classCompositionError } from '../lib/classComposition';
 import { computeProjectedEndDate } from '../lib/classProgress';
+import { planClassTakeOver, syncUpcomingSessionStudents } from '../lib/classSync';
+import { toDateKey } from '../lib/dates';
 import { addMinutesToTime, generateRecurringDates, suggestPlannedEndDate } from '../lib/recurring';
 import { previewConflicts, buildRecurringPreview } from '../lib/schedulePreview';
 import {
@@ -212,6 +214,12 @@ interface DashboardStore extends DashboardSnapshot {
     notes?: string;
   }) => boolean;
   upsertClassMaster: (input: Omit<ClassMaster, 'id'> & { id?: string }) => string | null;
+  takeOverClasses: (input: {
+    classIds: string[];
+    newSenseiId: string;
+    effectiveDate: string;
+    reason: string;
+  }) => boolean;
   generateClassSchedule: (input: {
     classId: string;
     startDate: string;
@@ -703,7 +711,12 @@ export const useDashboardStore = create<DashboardStore>()(
         // stale record (still under this same id) in the array let any
         // conflict it was already part of block the edit regardless of the
         // new time — even a fully conflict-free new time couldn't save.
-        if (wouldConflict(state.schedules.filter((item) => item.id !== id), next)) {
+        if (
+          wouldConflict(
+            state.schedules.filter((item) => item.id !== id),
+            next
+          )
+        ) {
           toast.error('Perubahan menyebabkan konflik jadwal');
           return false;
         }
@@ -803,7 +816,12 @@ export const useDashboardStore = create<DashboardStore>()(
         // Same stale-self-copy issue as updateClass above: drop the pre-swap
         // record before checking, or an unrelated conflict it was already
         // part of (under the old sensei) could block the swap outright.
-        if (wouldConflict(state.schedules.filter((item) => item.id !== id), next)) {
+        if (
+          wouldConflict(
+            state.schedules.filter((item) => item.id !== id),
+            next
+          )
+        ) {
           toast.error('Sensei pengganti sudah punya kelas di jam ini');
           return false;
         }
@@ -1157,7 +1175,10 @@ export const useDashboardStore = create<DashboardStore>()(
             auditLogs: current.auditLogs
           };
         });
-        void safeRemote(() => updateSenseiNeedsAttentionRemote(senseiId, needsAttention), 'Simpan status Need Attention');
+        void safeRemote(
+          () => updateSenseiNeedsAttentionRemote(senseiId, needsAttention),
+          'Simpan status Need Attention'
+        );
         toast.success(needsAttention ? 'Sensei ditandai Need Attention' : 'Tanda Need Attention dihapus');
       },
       updateSenseiCapabilities: (senseiId, capabilities) => {
@@ -1177,11 +1198,16 @@ export const useDashboardStore = create<DashboardStore>()(
             newValue: capabilities
           });
           return {
-            sensei: current.sensei.map((item) => (item.id === senseiId ? { ...item, ...capabilities } : item)),
+            sensei: current.sensei.map((item) =>
+              item.id === senseiId ? { ...item, ...capabilities } : item
+            ),
             auditLogs: current.auditLogs
           };
         });
-        void safeRemote(() => updateSenseiCapabilitiesRemote(senseiId, capabilities), 'Simpan kemampuan mengajar');
+        void safeRemote(
+          () => updateSenseiCapabilitiesRemote(senseiId, capabilities),
+          'Simpan kemampuan mengajar'
+        );
         toast.success('Kemampuan mengajar disimpan');
       },
       upsertSensei: (input) => {
@@ -1423,7 +1449,9 @@ export const useDashboardStore = create<DashboardStore>()(
           actorName: state.currentUser?.name,
           classType: nextClass?.type ?? student.type,
           senseiId:
-            nextClass?.senseiId ?? findActiveEnrollment(state.enrollments, studentId, level)?.senseiId ?? null,
+            nextClass?.senseiId ??
+            findActiveEnrollment(state.enrollments, studentId, level)?.senseiId ??
+            null,
           classId: nextClass?.id ?? null,
           requiredMeetings: nextClass?.requiredMeetings ?? null,
           plannedEndDate: nextClass?.plannedEndDate ?? null,
@@ -1485,18 +1513,36 @@ export const useDashboardStore = create<DashboardStore>()(
           createId,
           actorName: state.currentUser?.name
         });
+        const syncedSessions = input.id
+          ? syncUpcomingSessionStudents({
+              schedules: state.schedules,
+              reports: state.sessionReports,
+              classId: id,
+              studentIds: next.studentIds,
+              today: toDateKey(new Date()),
+              updatedBy: state.currentUser?.name
+            })
+          : [];
+        const syncedById = new Map(syncedSessions.map((item) => [item.id, item]));
         set((current) => {
           const exists = current.classMasters.some((item) => item.id === id);
           pushAudit(current, {
             action: exists ? 'update_class_master' : 'create_class_master',
             entity: 'class_masters',
             recordId: id,
-            newValue: { class: next, enrollmentIds: ensured.changed.map((item) => item.id) }
+            newValue: {
+              class: next,
+              enrollmentIds: ensured.changed.map((item) => item.id),
+              sessionsSynced: syncedSessions.length
+            }
           });
           return {
             classMasters: exists
               ? current.classMasters.map((item) => (item.id === id ? next : item))
               : [next, ...current.classMasters],
+            schedules: syncedSessions.length
+              ? current.schedules.map((item) => syncedById.get(item.id) ?? item)
+              : current.schedules,
             enrollments: ensured.enrollments,
             auditLogs: current.auditLogs
           };
@@ -1506,9 +1552,120 @@ export const useDashboardStore = create<DashboardStore>()(
           for (const enrollment of ensured.changed) {
             await upsertEnrollmentRemote(enrollment);
           }
+          for (const session of syncedSessions) await upsertScheduleRemote(session);
         }, 'Simpan Class Master');
-        toast.success('Class Master disimpan');
+        toast.success(
+          syncedSessions.length
+            ? `Class Master disimpan · daftar siswa di ${syncedSessions.length} sesi mendatang ikut diperbarui`
+            : 'Class Master disimpan'
+        );
         return id;
+      },
+      takeOverClasses: ({ classIds, newSenseiId, effectiveDate, reason }) => {
+        const state = get();
+        if (!getPermissions(state.currentUser?.role ?? 'Sensei').canAssignSensei) {
+          toast.error('Hanya Super Admin yang bisa melakukan Take Over');
+          return false;
+        }
+        const note = reason.trim();
+        if (!note) {
+          toast.error('Alasan Take Over wajib diisi');
+          return false;
+        }
+        const incoming = state.sensei.find((item) => item.id === newSenseiId);
+        if (!incoming || incoming.primaryStatus !== 'ACTIVE') {
+          toast.error('Pilih Sensei pengganti yang aktif');
+          return false;
+        }
+        const classes = state.classMasters.filter(
+          (item) => classIds.includes(item.id) && item.senseiId !== newSenseiId
+        );
+        if (!classes.length) {
+          toast.error('Tidak ada kelas yang perlu dipindahkan');
+          return false;
+        }
+
+        const moved: ClassSession[] = [];
+        for (const teachingClass of classes) {
+          const plan = planClassTakeOver({
+            schedules: state.schedules,
+            reports: state.sessionReports,
+            classId: teachingClass.id,
+            newSenseiId,
+            effectiveDate,
+            reason: note,
+            updatedBy: state.currentUser?.name
+          });
+          if (plan.conflicts.length) {
+            const sample = plan.conflicts
+              .slice(0, 3)
+              .map((item) => `${item.date} ${item.startTime}`)
+              .join(', ');
+            toast.error(
+              `${teachingClass.displayName}: ${incoming.name} bentrok di ${plan.conflicts.length} sesi (${sample}). Take Over dibatalkan.`
+            );
+            return false;
+          }
+          moved.push(...plan.moved);
+        }
+
+        const classIdSet = new Set(classes.map((item) => item.id));
+        const movedById = new Map(moved.map((item) => [item.id, item]));
+        const now = new Date().toISOString();
+        const updatedClasses = classes.map<ClassMaster>((item) => ({
+          ...item,
+          senseiId: newSenseiId,
+          updatedAt: now,
+          updatedBy: state.currentUser?.name
+        }));
+        const updatedClassById = new Map(updatedClasses.map((item) => [item.id, item]));
+        const updatedEnrollments = state.enrollments
+          .filter(
+            (item) =>
+              item.classId &&
+              classIdSet.has(item.classId) &&
+              isCurrentEnrollmentStatus(item.status) &&
+              item.senseiId !== newSenseiId
+          )
+          .map<Enrollment>((item) => ({
+            ...item,
+            senseiId: newSenseiId,
+            updatedAt: now,
+            updatedBy: state.currentUser?.name
+          }));
+        const updatedEnrollmentById = new Map(updatedEnrollments.map((item) => [item.id, item]));
+
+        set((current) => {
+          for (const teachingClass of classes) {
+            pushAudit(current, {
+              action: 'take_over_class',
+              entity: 'class_masters',
+              recordId: teachingClass.id,
+              oldValue: { senseiId: teachingClass.senseiId },
+              newValue: {
+                senseiId: newSenseiId,
+                effectiveDate,
+                sessionsMoved: moved.filter((item) => item.classId === teachingClass.id).length
+              },
+              reason: note
+            });
+          }
+          return {
+            classMasters: current.classMasters.map((item) => updatedClassById.get(item.id) ?? item),
+            schedules: current.schedules.map((item) => movedById.get(item.id) ?? item),
+            enrollments: current.enrollments.map((item) => updatedEnrollmentById.get(item.id) ?? item),
+            auditLogs: current.auditLogs
+          };
+        });
+        void safeRemote(async () => {
+          for (const item of updatedClasses) await upsertClassMasterRemote(item);
+          for (const item of moved) await upsertScheduleRemote(item);
+          for (const item of updatedEnrollments) await upsertEnrollmentRemote(item);
+        }, 'Take Over kelas');
+        toast.success(
+          `${classes.length} kelas diambil alih ${incoming.name} · ${moved.length} sesi mendatang dipindahkan`
+        );
+        return true;
       },
       generateClassSchedule: ({ classId, startDate, weekdays, startTime, meetings }) => {
         const state = get();
@@ -1841,7 +1998,9 @@ export const useDashboardStore = create<DashboardStore>()(
         const existing = state.classMasters.find((item) => item.id === classId);
         if (!existing) return false;
         if (state.schedules.some((x) => x.classId === classId)) {
-          toast.error('Tidak bisa hapus — masih ada jadwal (termasuk yang dibatalkan). Set Cancelled/Draft saja.');
+          toast.error(
+            'Tidak bisa hapus — masih ada jadwal (termasuk yang dibatalkan). Set Cancelled/Draft saja.'
+          );
           return false;
         }
         // No schedule ever existed for this class, so any linked enrollment cannot
@@ -1851,7 +2010,9 @@ export const useDashboardStore = create<DashboardStore>()(
         const linkedEnrollments = state.enrollments.filter((x) => x.classId === classId);
         const withProgress = linkedEnrollments.filter((x) => (x.sessionsCompleted ?? 0) > 0);
         if (withProgress.length) {
-          toast.error('Tidak bisa hapus — ada enrollment siswa yang sudah punya progress sesi. Set Cancelled/Draft saja.');
+          toast.error(
+            'Tidak bisa hapus — ada enrollment siswa yang sudah punya progress sesi. Set Cancelled/Draft saja.'
+          );
           return false;
         }
         try {
@@ -1867,7 +2028,8 @@ export const useDashboardStore = create<DashboardStore>()(
             entity: 'class_masters',
             recordId: classId,
             oldValue: { displayName: existing.displayName, level: existing.level },
-            reason: 'Class Master dihapus dari dashboard (belum ada jadwal; enrollment tanpa progress ikut dihapus)'
+            reason:
+              'Class Master dihapus dari dashboard (belum ada jadwal; enrollment tanpa progress ikut dihapus)'
           });
           return {
             classMasters: current.classMasters.filter((item) => item.id !== classId),
@@ -1920,12 +2082,27 @@ export function useScopedData() {
       availability,
       sessionLogs,
       sessionReports,
+      classSchedules: schedules,
+      classReports: sessionReports,
       qaScores,
       linkedSenseiId
     };
   }
 
   const senseiId = linkedSenseiId;
+  // A substitute (swap / take over) teaches only some sessions of a class but
+  // must still see the whole class: its Class Master, students, and the
+  // sessions + reports earlier Sensei already filed.
+  const myClassIds = new Set(
+    schedules
+      .filter((item) => item.senseiId === senseiId && item.classId)
+      .map((item) => item.classId as string)
+  );
+  const myClasses = classMasters.filter((item) => item.senseiId === senseiId || myClassIds.has(item.id));
+  const classSchedules = schedules.filter(
+    (item) => item.senseiId === senseiId || (item.classId != null && myClassIds.has(item.classId))
+  );
+  const classScheduleIds = new Set(classSchedules.map((item) => item.id));
   // A student "belongs" to this Sensei when their current active Enrollment
   // says so, or they sit in one of this Sensei's Class Masters — not a cached
   // per-student field, which never stayed in sync when a Sensei was swapped.
@@ -1933,18 +2110,20 @@ export function useScopedData() {
     ...enrollments
       .filter((item) => item.senseiId === senseiId && isCurrentEnrollmentStatus(item.status))
       .map((item) => item.studentId),
-    ...classMasters.filter((item) => item.senseiId === senseiId).flatMap((item) => item.studentIds)
+    ...myClasses.flatMap((item) => item.studentIds)
   ]);
   return {
     sensei: sensei.filter((item) => item.id === senseiId),
     students: students.filter((item) => myStudentIds.has(item.id)),
-    classMasters: classMasters.filter((item) => item.senseiId === senseiId),
+    classMasters: myClasses,
     schedules: schedules.filter((item) => item.senseiId === senseiId),
     availability: availability.filter((item) => item.senseiId === senseiId),
     sessionLogs: sessionLogs.filter((item) => item.senseiId === senseiId),
     sessionReports: sessionReports.filter((item) =>
       schedules.some((session) => session.id === item.scheduleId && session.senseiId === senseiId)
     ),
+    classSchedules,
+    classReports: sessionReports.filter((item) => classScheduleIds.has(item.scheduleId)),
     qaScores: qaScores.filter((item) => item.senseiId === senseiId),
     linkedSenseiId
   };
