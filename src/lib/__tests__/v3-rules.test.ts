@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getPermissions } from '../rbac';
 import { getOperationalLabels } from '../labels';
 import { getWorkloadMetrics, getDayCapacity, formatHoursShort } from '../workload';
-import { findConflicts } from '../schedule';
+import { findConflicts, propagateClassMasterChange } from '../schedule';
 import { getDisciplinaryMetrics } from '../disciplinary';
 import { getSessionWorkflow, isLateJoin } from '../session';
 import { filterAcademicReportRows, hasActiveOrCompletedMakeup } from '../makeup';
@@ -673,5 +673,76 @@ describe('resolveSenseiId', () => {
 
   it('trusts profiles.sensei_id even when list empty', () => {
     expect(resolveSenseiId([], { senseiId: list[0].id, email: 'other@test.com' })).toBe(list[0].id);
+  });
+});
+
+describe('propagateClassMasterChange', () => {
+  const base = { classId: 'c1', studentIds: ['a', 'b'] };
+  const sessions: ClassSession[] = [
+    classOf({ id: 'past', date: '2026-10-13', startTime: '19:00', endTime: '20:30', status: 'completed', ...base }),
+    classOf({ id: 'cancelled', date: '2026-10-22', startTime: '19:00', endTime: '20:30', status: 'cancelled', ...base }),
+    classOf({ id: 'future1', date: '2026-10-21', startTime: '19:00', endTime: '20:30', ...base }),
+    classOf({ id: 'future2', date: '2026-10-28', startTime: '19:00', endTime: '20:30', ...base }),
+    classOf({ id: 'other-class', date: '2026-10-21', startTime: '10:00', endTime: '11:30', ...base, classId: 'c2' })
+  ];
+  const today = '2026-10-19';
+
+  it('adds a new student to future active sessions of that class only', () => {
+    const changed = propagateClassMasterChange(
+      sessions,
+      'c1',
+      { senseiId: 's1', studentIds: ['a', 'b'] },
+      { senseiId: 's1', studentIds: ['a', 'b', 'c'] },
+      today
+    );
+    expect(changed.map((item) => item.id)).toEqual(['future1', 'future2']);
+    expect(changed.every((item) => item.studentIds.join() === 'a,b,c')).toBe(true);
+  });
+
+  it('keeps a per-session removal when another student is added', () => {
+    const custom = sessions.map((item) => (item.id === 'future2' ? { ...item, studentIds: ['a'] } : item));
+    const changed = propagateClassMasterChange(
+      custom,
+      'c1',
+      { senseiId: 's1', studentIds: ['a', 'b'] },
+      { senseiId: 's1', studentIds: ['a', 'b', 'c'] },
+      today
+    );
+    expect(changed.find((item) => item.id === 'future2')?.studentIds).toEqual(['a', 'c']);
+  });
+
+  it('removes a dropped student from future sessions', () => {
+    const changed = propagateClassMasterChange(
+      sessions,
+      'c1',
+      { senseiId: 's1', studentIds: ['a', 'b'] },
+      { senseiId: 's1', studentIds: ['a'] },
+      today
+    );
+    expect(changed.every((item) => item.studentIds.join() === 'a')).toBe(true);
+  });
+
+  it('moves the Sensei only on sessions still held by the previous Sensei', () => {
+    const swapped = sessions.map((item) => (item.id === 'future2' ? { ...item, senseiId: 's9' } : item));
+    const changed = propagateClassMasterChange(
+      swapped,
+      'c1',
+      { senseiId: 's1', studentIds: ['a', 'b'] },
+      { senseiId: 's2', studentIds: ['a', 'b'] },
+      today
+    );
+    expect(changed.map((item) => [item.id, item.senseiId])).toEqual([['future1', 's2']]);
+  });
+
+  it('returns nothing when students and Sensei are unchanged', () => {
+    expect(
+      propagateClassMasterChange(
+        sessions,
+        'c1',
+        { senseiId: 's1', studentIds: ['a', 'b'] },
+        { senseiId: 's1', studentIds: ['b', 'a'] },
+        today
+      )
+    ).toEqual([]);
   });
 });

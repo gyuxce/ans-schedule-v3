@@ -3,7 +3,8 @@ import { persist } from 'zustand/middleware';
 import { toast } from 'sonner';
 import { WEEKLY_HOUR_TARGET } from '../constants';
 import { getPermissions } from '../lib/rbac';
-import { wouldConflict } from '../lib/schedule';
+import { toDateKey } from '../lib/dates';
+import { propagateClassMasterChange, wouldConflict } from '../lib/schedule';
 import { isLateJoin } from '../lib/session';
 import { isUuid, resolveSenseiId } from '../lib/senseiLink';
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
@@ -1485,18 +1486,54 @@ export const useDashboardStore = create<DashboardStore>()(
           createId,
           actorName: state.currentUser?.name
         });
+        const previous = state.classMasters.find((item) => item.id === id);
+        const propagated = previous
+          ? propagateClassMasterChange(state.schedules, id, previous, next, toDateKey(new Date())).map(
+              (session) => ({ ...session, updatedAt: next.updatedAt, updatedBy: next.updatedBy })
+            )
+          : [];
+        if (previous && previous.senseiId !== next.senseiId) {
+          const originalById = new Map(state.schedules.map((item) => [item.id, item]));
+          const propagatedById = new Map(propagated.map((item) => [item.id, item]));
+          const merged = state.schedules.map((item) => propagatedById.get(item.id) ?? item);
+          const clashes = propagated.filter(
+            (session) =>
+              originalById.get(session.id)?.senseiId !== session.senseiId &&
+              wouldConflict(
+                merged.filter((item) => item.id !== session.id),
+                session
+              )
+          );
+          if (clashes.length) {
+            toast.error(
+              `Sensei baru bentrok di ${clashes
+                .slice(0, 3)
+                .map((item) => `${item.date} ${item.startTime}`)
+                .join(', ')}${clashes.length > 3 ? ` dan ${clashes.length - 3} sesi lain` : ''}. Class Master tidak disimpan.`
+            );
+            return null;
+          }
+        }
+        const propagatedById = new Map(propagated.map((item) => [item.id, item]));
         set((current) => {
           const exists = current.classMasters.some((item) => item.id === id);
           pushAudit(current, {
             action: exists ? 'update_class_master' : 'create_class_master',
             entity: 'class_masters',
             recordId: id,
-            newValue: { class: next, enrollmentIds: ensured.changed.map((item) => item.id) }
+            newValue: {
+              class: next,
+              enrollmentIds: ensured.changed.map((item) => item.id),
+              schedulesUpdated: propagated.length
+            }
           });
           return {
             classMasters: exists
               ? current.classMasters.map((item) => (item.id === id ? next : item))
               : [next, ...current.classMasters],
+            schedules: propagated.length
+              ? current.schedules.map((item) => propagatedById.get(item.id) ?? item)
+              : current.schedules,
             enrollments: ensured.enrollments,
             auditLogs: current.auditLogs
           };
@@ -1506,8 +1543,15 @@ export const useDashboardStore = create<DashboardStore>()(
           for (const enrollment of ensured.changed) {
             await upsertEnrollmentRemote(enrollment);
           }
+          for (const session of propagated) {
+            await upsertScheduleRemote(session);
+          }
         }, 'Simpan Class Master');
-        toast.success('Class Master disimpan');
+        toast.success(
+          propagated.length
+            ? `Class Master disimpan · ${propagated.length} jadwal ke depan ikut diperbarui`
+            : 'Class Master disimpan'
+        );
         return id;
       },
       generateClassSchedule: ({ classId, startDate, weekdays, startTime, meetings }) => {
