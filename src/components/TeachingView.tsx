@@ -52,7 +52,8 @@ export function TeachingView() {
   const submitSessionReport = useDashboardStore((state) => state.submitSessionReport);
   const overrideAttendance = useDashboardStore((state) => state.overrideAttendance);
   const overridePerformance = useDashboardStore((state) => state.overridePerformance);
-  const { schedules, sessionLogs, sessionReports, linkedSenseiId } = useScopedData();
+  const { schedules, sessionLogs, sessionReports, classSchedules, classReports, linkedSenseiId } =
+    useScopedData();
   const [selected, setSelected] = useState<ClassSession | null>(null);
   const [overrideReason, setOverrideReason] = useState('');
   const [clockInAt, setClockInAt] = useState('');
@@ -74,7 +75,7 @@ export function TeachingView() {
           const log = sessionLogs.find((item) => item.scheduleId === session.id);
           const report = sessionReports.find((item) => item.scheduleId === session.id);
           const teachingClass = classMasters.find((item) => item.id === session.classId);
-          const ordinal = getSessionOrdinal(session, schedules, teachingClass);
+          const ordinal = getSessionOrdinal(session, classSchedules, teachingClass, classReports);
           const scheduled = scheduledDurationMinutes(session);
           const actual = actualDurationMinutes(log);
           const variance = durationVarianceMinutes(session, log);
@@ -89,7 +90,7 @@ export function TeachingView() {
             variance
           };
         }),
-    [schedules, sessionLogs, sessionReports, classMasters]
+    [schedules, sessionLogs, sessionReports, classSchedules, classReports, classMasters]
   );
 
   const filtered = useMemo(() => {
@@ -448,7 +449,7 @@ function SessionDrawer(props: {
   const allSensei = useDashboardStore((state) => state.sensei);
   const { classReports } = useScopedData();
   const teachingClass = classMasters.find((item) => item.id === props.session.classId);
-  const ordinal = getSessionOrdinal(props.session, schedules, teachingClass);
+  const ordinal = getSessionOrdinal(props.session, schedules, teachingClass, classReports);
   const previousMaterials = useMemo(() => {
     const classId = props.session.classId;
     if (!classId) return [];
@@ -500,6 +501,14 @@ function SessionDrawer(props: {
         {props.log?.lateJoin ? <Badge tone="danger">Late join</Badge> : null}
         {props.log?.overridden ? <Badge tone="gold">Clock override</Badge> : null}
       </div>
+      {ordinal && ordinal.unreportedBefore > 0 ? (
+        <p className="rounded-xl border border-warn/25 bg-warn-soft px-3 py-2 text-sm text-ink">
+          {ordinal.unreportedBefore} sesi sebelumnya belum ada laporan, jadi urutan kalender (Sesi{' '}
+          {ordinal.index}) lebih besar dari progres selesai ({ordinal.completed}/{ordinal.required}). Rapikan
+          sesi lama di Jadwal Resmi: batalkan kalau memang tidak terlaksana, atau isi laporannya kalau sudah
+          berlangsung.
+        </p>
+      ) : null}
       {previousMaterials.length > 0 ? (
         <div className="rounded-xl border border-line p-3 text-sm">
           <p className="ui-label">Materi sebelumnya (maks. 5 sesi terakhir)</p>
