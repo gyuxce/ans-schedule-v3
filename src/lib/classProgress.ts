@@ -71,23 +71,37 @@ export function getClassProgress(
   };
 }
 
-/** Session X of required Y — X among non-cancelled non-extra sessions. */
+/**
+ * Session X of required Y — X is the position among non-cancelled non-extra
+ * sessions, not how many were actually delivered. When earlier past sessions
+ * never got a report the two diverge, so the label also says how many are done.
+ */
 export function getSessionOrdinal(
   session: ClassSession,
   schedules: ClassSession[],
-  teachingClass?: ClassMaster | null
+  teachingClass?: ClassMaster | null,
+  reports: SessionReport[] = [],
+  today = toDateKey(new Date())
 ) {
   if (!session.classId || !teachingClass) return null;
+  const required = teachingClass.requiredMeetings;
   if (session.isExtra) {
-    return { index: 0, required: teachingClass.requiredMeetings, label: 'Extra' };
+    return { index: 0, required, completed: 0, unreportedBefore: 0, label: 'Extra' };
   }
   const calendar = classCalendarSessions(session.classId, schedules);
   const index = calendar.findIndex((item) => item.id === session.id);
   if (index < 0) return null;
+  const completed = calendar.filter((item) => isSessionCompleted(item, reports)).length;
+  const unreportedBefore = calendar
+    .slice(0, index)
+    .filter((item) => !isSessionCompleted(item, reports) && item.date < today).length;
+  const base = `Sesi ${index + 1} dari ${required}`;
   return {
     index: index + 1,
-    required: teachingClass.requiredMeetings,
-    label: `Sesi ${index + 1} dari ${teachingClass.requiredMeetings}`
+    required,
+    completed,
+    unreportedBefore,
+    label: unreportedBefore > 0 ? `${base} · ${completed} selesai` : base
   };
 }
 

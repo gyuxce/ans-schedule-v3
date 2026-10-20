@@ -69,7 +69,7 @@ export function buildEomSessionRows(input: {
     const teachingClass = session.classId
       ? input.classMasters.find((item) => item.id === session.classId)
       : undefined;
-    const ordinal = getSessionOrdinal(session, input.schedules, teachingClass);
+    const ordinal = getSessionOrdinal(session, input.schedules, teachingClass, input.sessionReports);
     const late = lateMinutes(session, log);
     const studentNames = session.studentIds
       .map((id) => input.students.find((s) => s.id === id)?.name ?? id)
