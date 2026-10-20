@@ -12,7 +12,12 @@ import { hasActiveOrCompletedMakeup } from '../lib/makeup';
 import { createAuthLogin } from '../lib/createAuthLogin';
 import { classCompositionError } from '../lib/classComposition';
 import { computeProjectedEndDate } from '../lib/classProgress';
-import { planClassTakeOver, syncUpcomingSessionStudents } from '../lib/classSync';
+import {
+  cancelUpcomingSessionsOfClass,
+  findSameDayDuplicate,
+  planClassTakeOver,
+  syncUpcomingSessionStudents
+} from '../lib/classSync';
 import { toDateKey } from '../lib/dates';
 import { addMinutesToTime, generateRecurringDates, suggestPlannedEndDate } from '../lib/recurring';
 import { previewConflicts, buildRecurringPreview } from '../lib/schedulePreview';
@@ -1513,17 +1518,31 @@ export const useDashboardStore = create<DashboardStore>()(
           createId,
           actorName: state.currentUser?.name
         });
-        const syncedSessions = input.id
-          ? syncUpcomingSessionStudents({
-              schedules: state.schedules,
-              reports: state.sessionReports,
-              classId: id,
-              studentIds: next.studentIds,
-              today: toDateKey(new Date()),
-              updatedBy: state.currentUser?.name
-            })
-          : [];
-        const syncedById = new Map(syncedSessions.map((item) => [item.id, item]));
+        const today = toDateKey(new Date());
+        const cancelledSessions =
+          input.id && next.status === 'cancelled'
+            ? cancelUpcomingSessionsOfClass({
+                schedules: state.schedules,
+                reports: state.sessionReports,
+                classId: id,
+                today,
+                reason: 'Class Master dibatalkan',
+                updatedBy: state.currentUser?.name
+              })
+            : [];
+        const syncedSessions =
+          input.id && next.status !== 'cancelled'
+            ? syncUpcomingSessionStudents({
+                schedules: state.schedules,
+                reports: state.sessionReports,
+                classId: id,
+                studentIds: next.studentIds,
+                today,
+                updatedBy: state.currentUser?.name
+              })
+            : [];
+        const touchedSessions = [...syncedSessions, ...cancelledSessions];
+        const syncedById = new Map(touchedSessions.map((item) => [item.id, item]));
         set((current) => {
           const exists = current.classMasters.some((item) => item.id === id);
           pushAudit(current, {
@@ -1533,14 +1552,15 @@ export const useDashboardStore = create<DashboardStore>()(
             newValue: {
               class: next,
               enrollmentIds: ensured.changed.map((item) => item.id),
-              sessionsSynced: syncedSessions.length
+              sessionsSynced: syncedSessions.length,
+              sessionsCancelled: cancelledSessions.length
             }
           });
           return {
             classMasters: exists
               ? current.classMasters.map((item) => (item.id === id ? next : item))
               : [next, ...current.classMasters],
-            schedules: syncedSessions.length
+            schedules: touchedSessions.length
               ? current.schedules.map((item) => syncedById.get(item.id) ?? item)
               : current.schedules,
             enrollments: ensured.enrollments,
@@ -1552,12 +1572,14 @@ export const useDashboardStore = create<DashboardStore>()(
           for (const enrollment of ensured.changed) {
             await upsertEnrollmentRemote(enrollment);
           }
-          for (const session of syncedSessions) await upsertScheduleRemote(session);
+          for (const session of touchedSessions) await upsertScheduleRemote(session);
         }, 'Simpan Class Master');
         toast.success(
-          syncedSessions.length
-            ? `Class Master disimpan · daftar siswa di ${syncedSessions.length} sesi mendatang ikut diperbarui`
-            : 'Class Master disimpan'
+          cancelledSessions.length
+            ? `Class Master disimpan · ${cancelledSessions.length} sesi mendatang ikut dibatalkan`
+            : syncedSessions.length
+              ? `Class Master disimpan · daftar siswa di ${syncedSessions.length} sesi mendatang ikut diperbarui`
+              : 'Class Master disimpan'
         );
         return id;
       },
@@ -1703,6 +1725,18 @@ export const useDashboardStore = create<DashboardStore>()(
           };
           if (wouldConflict([...state.schedules, ...created], session)) {
             toast.error(`Bentrok di ${date} ${startTime}. Generate dibatalkan.`);
+            return 0;
+          }
+          const duplicate = findSameDayDuplicate([...state.schedules, ...created], {
+            senseiId: session.senseiId,
+            studentIds: session.studentIds,
+            date,
+            classId
+          });
+          if (duplicate) {
+            toast.error(
+              `Siswa yang sama sudah punya sesi dengan Sensei ini di ${date} jam ${duplicate.startTime}, kemungkinan kelas ganda. Batalkan atau ubah kelas yang lama dulu (kalau memang 2 sesi sehari, buat lewat Jadwal Resmi). Generate dibatalkan.`
+            );
             return 0;
           }
           created.push(session);

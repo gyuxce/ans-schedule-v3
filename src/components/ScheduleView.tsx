@@ -356,23 +356,33 @@ export function ScheduleView() {
                     ) : (
                       rows.map((s) => {
                         const conflict = conflictIds.has(s.id);
+                        const cancelled = s.status === 'cancelled';
                         return (
                           <button
                             key={s.id}
                             type="button"
                             onClick={() => openEdit(s)}
-                            title={`${s.startTime}–${s.endTime} · ${s.level} · ${displayName(allSensei, s.senseiId)}`}
+                            title={`${s.startTime}–${s.endTime} · ${s.level} · ${displayName(allSensei, s.senseiId)}${cancelled ? ' · Batal' : ''}`}
                             className={`flex w-full items-stretch gap-1.5 overflow-hidden rounded-md border text-left transition-colors hover:border-line-strong ${
-                              conflict ? 'border-danger bg-danger-soft' : 'border-line bg-surface'
+                              cancelled
+                                ? 'border-line bg-surface opacity-55'
+                                : conflict
+                                  ? 'border-danger bg-danger-soft'
+                                  : 'border-line bg-surface'
                             }`}
                           >
                             <span className={`w-1 shrink-0 ${senseiRail(s.senseiId)}`} />
                             <span className="min-w-0 py-1 pr-1.5">
-                              <span className="block truncate text-[11px] font-semibold leading-tight text-ink">
+                              <span
+                                className={`block truncate text-[11px] font-semibold leading-tight text-ink ${
+                                  cancelled ? 'line-through' : ''
+                                }`}
+                              >
                                 {s.startTime} {s.level}
                               </span>
                               <span className="block truncate text-[10px] text-ink-soft">
                                 {displayName(allSensei, s.senseiId)}
+                                {cancelled ? ' · Batal' : ''}
                               </span>
                             </span>
                           </button>
@@ -646,12 +656,15 @@ export function ScheduleView() {
               {previewConflictList.length > 0 ? (
                 <div className="rounded-xl border border-danger/25 bg-danger-soft px-3 py-2 text-sm text-ink">
                   <p className="font-semibold">
-                    {previewConflictList.length} konflik dengan jadwal resmi Sensei yang sama.
+                    {previewConflictList.length} konflik / kemungkinan sesi ganda dengan jadwal resmi yang
+                    ada.
                   </p>
                   <ul className="mt-1 list-disc pl-4 text-xs">
                     {previewConflictList.slice(0, 5).map((item) => (
                       <li key={`${item.date}-${item.startTime}-${item.withDate}`}>
-                        {item.date} {item.startTime} bentrok dengan {item.withDate} {item.withStart}
+                        {item.kind === 'duplicate'
+                          ? `${item.date} ${item.startTime}: siswa yang sama sudah punya sesi dengan Sensei ini jam ${item.withStart} (kemungkinan kelas ganda)`
+                          : `${item.date} ${item.startTime} bentrok dengan ${item.withDate} ${item.withStart}`}
                       </li>
                     ))}
                   </ul>

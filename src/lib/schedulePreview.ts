@@ -2,6 +2,7 @@ import { format, parseISO } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import type { ClassSession } from '../types';
 import { addMinutesToTime, generateRecurringDates } from './recurring';
+import { findSameDayDuplicate } from './classSync';
 import { findConflicts } from './schedule';
 
 export type SchedulePreviewRow = {
@@ -54,7 +55,13 @@ export function previewConflicts(
     endTime: row.endTime,
     status: 'active'
   }));
-  const conflicts: Array<{ date: string; startTime: string; withDate: string; withStart: string }> = [];
+  const conflicts: Array<{
+    kind: 'overlap' | 'duplicate';
+    date: string;
+    startTime: string;
+    withDate: string;
+    withStart: string;
+  }> = [];
   let pool = [...existing];
   for (const candidate of candidates) {
     const hits = findConflicts(pool, candidate).filter(
@@ -63,11 +70,24 @@ export function previewConflicts(
     for (const hit of hits) {
       const other = hit.a.id === candidate.id ? hit.b : hit.a;
       conflicts.push({
+        kind: 'overlap',
         date: candidate.date,
         startTime: candidate.startTime,
         withDate: other.date,
         withStart: other.startTime
       });
+    }
+    if (!hits.length) {
+      const duplicate = findSameDayDuplicate(pool, candidate);
+      if (duplicate) {
+        conflicts.push({
+          kind: 'duplicate',
+          date: candidate.date,
+          startTime: candidate.startTime,
+          withDate: duplicate.date,
+          withStart: duplicate.startTime
+        });
+      }
     }
     pool = [...pool, candidate];
   }

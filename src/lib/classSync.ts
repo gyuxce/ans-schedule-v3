@@ -72,3 +72,46 @@ export function planClassTakeOver(input: {
   const conflicts = moved.filter((session) => wouldConflict(after, session));
   return { moved, conflicts };
 }
+
+/** Upcoming open sessions of a class, marked cancelled (used when the Class Master is cancelled). */
+export function cancelUpcomingSessionsOfClass(input: {
+  schedules: ClassSession[];
+  reports: SessionReport[];
+  classId: string;
+  today: string;
+  reason: string;
+  updatedBy?: string;
+}): ClassSession[] {
+  const updatedAt = new Date().toISOString();
+  return input.schedules
+    .filter((session) => session.classId === input.classId && isOpenFrom(session, input.reports, input.today))
+    .map<ClassSession>((session) => ({
+      ...session,
+      status: 'cancelled',
+      cancellationReason: input.reason,
+      cancellationInitiator: 'Admin',
+      replacementSecured: false,
+      updatedAt,
+      updatedBy: input.updatedBy
+    }));
+}
+
+/**
+ * Same Sensei, same day, at least one shared student, in a different class —
+ * usually a class entered twice with different times (no time overlap, so the
+ * normal conflict check misses it).
+ */
+export function findSameDayDuplicate(
+  existing: ClassSession[],
+  candidate: { senseiId: string; studentIds: string[]; date: string; classId?: string | null }
+) {
+  return existing.find(
+    (session) =>
+      session.status !== 'cancelled' &&
+      !session.isExtra &&
+      session.date === candidate.date &&
+      session.senseiId === candidate.senseiId &&
+      (candidate.classId == null || session.classId !== candidate.classId) &&
+      session.studentIds.some((id) => candidate.studentIds.includes(id))
+  );
+}

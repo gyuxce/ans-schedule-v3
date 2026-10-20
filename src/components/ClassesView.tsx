@@ -599,6 +599,10 @@ export function ClassesView() {
                     lama tidak ada jadwal baru sebagai Completed, bukan dibiarkan Active, supaya sensei-nya
                     otomatis muncul lagi sebagai UNASSIGNED kalau memang sudah tidak ada kelas berjalan.
                   </p>
+                  <p className="mt-1 text-xs text-ink-soft">
+                    <b>Cancelled</b> otomatis membatalkan semua sesi mendatang kelas ini yang belum ada
+                    laporannya. Sesi yang sudah lewat atau sudah dilaporkan tidak diubah.
+                  </p>
                 </label>
                 <label>
                   <span className="ui-label">Required meetings</span>
