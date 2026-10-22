@@ -126,14 +126,21 @@ export function CapacityHeatmap({
                     ) : null}
                     <div className="relative z-10 flex h-full flex-col">
                       {closed ? (
-                        <button
-                          type="button"
-                          disabled={!editable}
-                          onClick={() => onAddDay(item.id, dateKey, weekdayOf(dateKey))}
-                          className="flex h-full min-h-[92px] w-full items-center justify-center rounded-md text-[11px] text-ink-soft disabled:cursor-default"
-                        >
-                          {editable ? '+ Buka' : '—'}
-                        </button>
+                        <div className="flex h-full min-h-[92px] flex-col">
+                          {cap.sessions.length > 0 ? (
+                            <div className="px-1 pt-1 text-[10px] font-semibold text-warn">
+                              {cap.sessions.length} sesi di luar jam buka
+                            </div>
+                          ) : null}
+                          <button
+                            type="button"
+                            disabled={!editable}
+                            onClick={() => onAddDay(item.id, dateKey, weekdayOf(dateKey))}
+                            className="flex w-full flex-1 items-center justify-center rounded-md text-[11px] text-ink-soft disabled:cursor-default"
+                          >
+                            {editable ? '+ Buka' : '—'}
+                          </button>
+                        </div>
                       ) : (
                         <>
                           <div className="px-1 pt-1 text-[11px] font-semibold text-ink">
