@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { toast } from 'sonner';
-import { WEEKLY_HOUR_TARGET } from '../constants';
+import { DAYS_OF_WEEK, WEEKLY_HOUR_TARGET } from '../constants';
 import { getPermissions } from '../lib/rbac';
 import { wouldConflict } from '../lib/schedule';
 import { isLateJoin } from '../lib/session';
@@ -160,6 +160,7 @@ interface DashboardStore extends DashboardSnapshot {
   setWeekAnchor: (date: string) => void;
   upsertAvailability: (slot: Omit<AvailabilitySlot, 'id'> & { id?: string }) => void;
   removeAvailability: (id: string) => void;
+  restoreAvailability: (id: string) => void;
   createClass: (input: ClassInput, reason?: string) => boolean;
   createRecurringOfficialClass: (input: RecurringOfficialInput) => boolean;
   createExtraSession: (input: ClassInput & { classId: string }, reason?: string) => boolean;
@@ -482,7 +483,33 @@ export const useDashboardStore = create<DashboardStore>()(
             'Nonaktifkan ketersediaan'
           );
         }
-        toast.success('Slot ketersediaan dinonaktifkan');
+        const label = nextSlot
+          ? nextSlot.pattern === 'weekly'
+            ? `Slot mingguan ${DAYS_OF_WEEK.find((day) => day.value === nextSlot!.weekday)?.label ?? ''} ${nextSlot.startTime}–${nextSlot.endTime} dinonaktifkan untuk semua minggu`
+            : `Slot ${nextSlot.date} ${nextSlot.startTime}–${nextSlot.endTime} dinonaktifkan`
+          : 'Slot ketersediaan dinonaktifkan';
+        toast.success(label, {
+          duration: 15000,
+          action: { label: 'Urungkan', onClick: () => get().restoreAvailability(id) }
+        });
+      },
+      restoreAvailability: (id) => {
+        let nextSlot: AvailabilitySlot | undefined;
+        set((state) => {
+          nextSlot = state.availability.find((item) => item.id === id);
+          return {
+            availability: state.availability.map((item) =>
+              item.id === id ? { ...item, isActive: true } : item
+            )
+          };
+        });
+        if (nextSlot) {
+          void safeRemote(
+            () => upsertAvailabilityRemote({ ...nextSlot!, isActive: true }),
+            'Pulihkan ketersediaan'
+          );
+        }
+        toast.success('Slot ketersediaan dipulihkan');
       },
       createClass: (input, reason) => {
         const state = get();
