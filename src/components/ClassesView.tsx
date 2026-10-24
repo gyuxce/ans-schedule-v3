@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import { CLASS_LEVELS, CLASS_MASTER_STATUSES, CLASS_TYPES, DAYS_OF_WEEK } from '../constants';
-import { getClassHealth, getClassProgress, type ClassHealthStatus } from '../lib/classProgress';
+import {
+  getClassHealth,
+  getClassProgress,
+  getNotRunningStreak,
+  type ClassHealthStatus
+} from '../lib/classProgress';
 import { formatDay } from '../lib/dates';
 import { displayName, TYPE_TONE } from '../lib/display';
 import { generateRecurringDates } from '../lib/recurring';
@@ -177,7 +182,8 @@ export function ClassesView() {
       classMasters.map((item) => ({
         item,
         progress: getClassProgress(item, schedules, sessionReports),
-        health: getClassHealth(item, schedules, sessionReports)
+        health: getClassHealth(item, schedules, sessionReports),
+        idleStreak: getNotRunningStreak(item.id, schedules, sessionReports).streak
       })),
     [classMasters, schedules, sessionReports]
   );
@@ -279,7 +285,7 @@ export function ClassesView() {
 
       {view === 'compact' ? (
         <div className="space-y-1.5">
-          {visible.map(({ item, progress, health }) => {
+          {visible.map(({ item, progress, health, idleStreak }) => {
             const senseiName = displayName(allSensei, item.senseiId);
             const overTarget = progress.calendarCount > progress.required;
             return (
@@ -298,6 +304,7 @@ export function ClassesView() {
                     <span className="truncate text-sm font-semibold text-ink">{item.displayName}</span>
                     <Badge tone={TYPE_TONE[item.type]}>{item.type}</Badge>
                     {overTarget ? <Badge tone="gold">LEWAT TARGET</Badge> : null}
+                    {idleStreak >= 2 ? <Badge tone="danger">Tak jalan {idleStreak}x</Badge> : null}
                   </div>
                   <p className="truncate text-[11px] text-ink-soft">
                     {item.level} · {senseiName} · {item.studentIds.length} siswa
@@ -306,14 +313,14 @@ export function ClassesView() {
                 </div>
                 <div className="hidden w-24 shrink-0 sm:block">
                   <Meter
-                    value={progress.completed}
-                    max={Math.max(progress.required, 1)}
+                    value={progress.consumed}
+                    max={Math.max(progress.totalSlots, 1)}
                     tone={HEALTH_METER[health.status]}
                   />
                 </div>
                 <span className="shrink-0 tabular-nums text-sm font-bold text-ink">
-                  {progress.completed}
-                  <span className="text-xs font-medium text-ink-soft">/{progress.required}</span>
+                  {progress.consumed}
+                  <span className="text-xs font-medium text-ink-soft">/{progress.totalSlots}</span>
                 </span>
               </button>
             );
@@ -329,7 +336,7 @@ export function ClassesView() {
         </div>
       ) : (
       <div className="space-y-3">
-        {visible.map(({ item, progress, health }) => {
+        {visible.map(({ item, progress, health, idleStreak }) => {
           const senseiName = displayName(allSensei, item.senseiId);
           const students = item.studentIds.map((id) => displayName(allStudents, id));
           const open = () => openDetail(item);
@@ -353,6 +360,7 @@ export function ClassesView() {
                     <h3 className="text-base font-semibold text-ink">{item.displayName}</h3>
                     <Badge tone={TYPE_TONE[item.type]}>{item.type}</Badge>
                     <Badge>{item.status}</Badge>
+                    {idleStreak >= 2 ? <Badge tone="danger">Tak jalan {idleStreak}x</Badge> : null}
                   </div>
                   <p className="mt-0.5 text-sm text-ink-soft">{item.level}</p>
                   <div className="mt-2 flex items-center gap-2">
@@ -377,7 +385,8 @@ export function ClassesView() {
                   <div className="mt-3">
                     <div className="mb-1 flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-ink">
-                        {progress.completed}/{progress.required} sesi selesai
+                        {progress.consumed}/{progress.totalSlots} sesi
+                        {progress.skipped > 0 ? ` (${progress.skipped} izin)` : ' selesai'}
                       </span>
                       <span className={progress.calendarCount > progress.required ? 'font-semibold text-warn' : 'text-ink-soft'}>
                         {progress.calendarCount === 0
@@ -388,8 +397,8 @@ export function ClassesView() {
                       </span>
                     </div>
                     <Meter
-                      value={progress.completed}
-                      max={Math.max(progress.required, 1)}
+                      value={progress.consumed}
+                      max={Math.max(progress.totalSlots, 1)}
                       tone={HEALTH_METER[health.status]}
                     />
                   </div>
@@ -398,8 +407,8 @@ export function ClassesView() {
                 <div className="lg:border-l lg:border-line lg:pl-4">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-2xl font-bold tabular-nums text-ink">
-                      {progress.completed}
-                      <span className="text-base font-semibold text-ink-soft">/{progress.required}</span>
+                      {progress.consumed}
+                      <span className="text-base font-semibold text-ink-soft">/{progress.totalSlots}</span>
                     </p>
                     <Badge tone={HEALTH_TONE[health.status]}>{HEALTH_LABEL[health.status]}</Badge>
                   </div>

@@ -16,6 +16,7 @@ import {
   cancelUpcomingSessionsOfClass,
   findSameDayDuplicate,
   planClassTakeOver,
+  planSkipReplacement,
   syncUpcomingSessionStudents
 } from '../lib/classSync';
 import { toDateKey } from '../lib/dates';
@@ -170,6 +171,7 @@ interface DashboardStore extends DashboardSnapshot {
     payload: { reason: string; initiator: CancellationInitiator; replacementSecured: boolean }
   ) => void;
   swapSensei: (id: string, newSenseiId: string, initiator: SwapInitiator, reason: string) => boolean;
+  skipSession: (id: string, reason: string) => boolean;
   clockIn: (scheduleId: string, at?: string) => void;
   clockOut: (scheduleId: string, at?: string) => void;
   overrideClock: (scheduleId: string, clockInAt: string, clockOutAt: string | null, reason: string) => void;
@@ -831,6 +833,90 @@ export const useDashboardStore = create<DashboardStore>()(
           }, 'Batalkan kelas');
         }
         toast.success('Kelas dibatalkan dan tercatat di audit log');
+      },
+      skipSession: (id, reason) => {
+        const state = get();
+        if (!getPermissions(state.currentUser?.role ?? 'Sensei').canEditOfficialSchedule) {
+          toast.error('Hanya Super Admin yang bisa mengubah jadwal resmi');
+          return false;
+        }
+        const note = reason.trim();
+        if (!note) {
+          toast.error('Alasan izin wajib diisi');
+          return false;
+        }
+        const existing = state.schedules.find((item) => item.id === id);
+        if (!existing || !existing.classId || existing.isExtra || existing.status !== 'active') {
+          toast.error('Hanya sesi aktif milik sebuah kelas yang bisa diloncati');
+          return false;
+        }
+        if (state.sessionReports.some((item) => item.scheduleId === id)) {
+          toast.error('Sesi ini sudah punya laporan, tidak bisa diloncati');
+          return false;
+        }
+        const teachingClass = state.classMasters.find((item) => item.id === existing.classId);
+        if (!teachingClass) {
+          toast.error('Class Master sesi ini tidak ditemukan');
+          return false;
+        }
+        const replacement = planSkipReplacement({
+          schedules: state.schedules,
+          session: existing,
+          senseiId: teachingClass.senseiId,
+          today: toDateKey(new Date()),
+          createId,
+          updatedBy: state.currentUser?.name
+        });
+        if (!replacement) {
+          toast.error(
+            'Tidak ada slot kosong 4 minggu ke depan untuk sesi pengganti. Tambahkan sesi manual dulu.'
+          );
+          return false;
+        }
+        const skipped: ClassSession = {
+          ...existing,
+          status: 'cancelled',
+          cancellationReason: note,
+          cancellationInitiator: 'Izin',
+          replacementSecured: true,
+          updatedAt: new Date().toISOString(),
+          updatedBy: state.currentUser?.name
+        };
+        let patchedClass: ClassMaster | undefined;
+        set((current) => {
+          pushAudit(current, {
+            action: 'skip_session',
+            entity: 'schedules',
+            recordId: id,
+            oldValue: { status: existing.status, date: existing.date },
+            newValue: {
+              status: 'cancelled',
+              initiator: 'Izin',
+              replacementId: replacement.id,
+              replacementDate: replacement.date
+            },
+            reason: note
+          });
+          const schedules = [
+            replacement,
+            ...current.schedules.map((item) => (item.id === id ? skipped : item))
+          ];
+          const classMasters = current.classMasters.map((item) => {
+            if (item.id !== teachingClass.id) return item;
+            patchedClass = withRefreshedProjectedEnd(item, schedules, current.currentUser?.name);
+            return patchedClass;
+          });
+          return { schedules, classMasters, auditLogs: current.auditLogs };
+        });
+        void safeRemote(async () => {
+          await upsertScheduleRemote(skipped);
+          await upsertScheduleRemote(replacement);
+          if (patchedClass) await upsertClassMasterRemote(patchedClass);
+        }, 'Izin / loncat sesi');
+        toast.success(
+          `Sesi ${existing.date} diloncati (izin). Sesi pengganti ditambahkan: ${replacement.date} ${replacement.startTime}`
+        );
+        return true;
       },
       swapSensei: (id, newSenseiId, initiator, reason) => {
         const state = get();

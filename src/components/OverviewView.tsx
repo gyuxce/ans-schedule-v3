@@ -25,7 +25,8 @@ const KIND_ICON: Record<ActionItem['kind'], typeof Clock> = {
   hours_below_target: Gauge,
   low_availability: Clock,
   ending_soon: Clock,
-  overdue_class: AlertTriangle
+  overdue_class: AlertTriangle,
+  class_not_running: AlertTriangle
 };
 
 const KIND_LABEL: Record<ActionItem['kind'], string> = {
@@ -37,7 +38,8 @@ const KIND_LABEL: Record<ActionItem['kind'], string> = {
   hours_below_target: 'Di bawah target jam',
   low_availability: 'Ketersediaan rendah',
   ending_soon: 'Ending soon',
-  overdue_class: 'Kelas overdue'
+  overdue_class: 'Kelas overdue',
+  class_not_running: 'Kelas tidak berjalan'
 };
 
 const SEV_DOT: Record<ActionItem['severity'], string> = {
@@ -53,6 +55,7 @@ const KIND_TAB: Record<ActionItem['kind'], TabId> = {
   schedule_conflict: 'schedule',
   ending_soon: 'students',
   overdue_class: 'classes',
+  class_not_running: 'classes',
   unassigned_sensei: 'sensei',
   hours_below_target: 'sensei',
   low_availability: 'availability'

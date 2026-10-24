@@ -1,3 +1,4 @@
+import { addDays, format, getDay, parseISO } from 'date-fns';
 import type { ClassSession, SessionReport } from '../types';
 import { wouldConflict } from './schedule';
 
@@ -114,4 +115,67 @@ export function findSameDayDuplicate(
       (candidate.classId == null || session.classId !== candidate.classId) &&
       session.studentIds.some((id) => candidate.studentIds.includes(id))
   );
+}
+
+const weekdayOf = (date: string) => getDay(parseISO(`${date}T00:00:00`));
+
+/**
+ * The session that takes the place of a skipped (izin) one: the next slot after
+ * the class's last session that follows the class's own weekday pattern, at the
+ * time that weekday normally uses, and free for the Sensei. Null if none within 4 weeks.
+ */
+export function planSkipReplacement(input: {
+  schedules: ClassSession[];
+  session: ClassSession;
+  senseiId: string;
+  today: string;
+  createId: () => string;
+  updatedBy?: string;
+}): ClassSession | null {
+  const classId = input.session.classId;
+  if (!classId) return null;
+  const live = input.schedules
+    .filter(
+      (item) =>
+        item.classId === classId &&
+        !item.isExtra &&
+        item.status !== 'cancelled' &&
+        item.id !== input.session.id
+    )
+    .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`));
+  const last = live[live.length - 1] ?? input.session;
+  // Only current sessions define the pattern: a class whose weekdays changed keeps old ones in its history.
+  const cutoff = format(addDays(parseISO(`${input.today}T00:00:00`), -14), 'yyyy-MM-dd');
+  const current = live.filter((item) => item.date >= cutoff);
+  const patternSource = current.length > 0 ? current : live.slice(-4);
+  const weekdays = new Set([...patternSource, input.session].map((item) => weekdayOf(item.date)));
+  const timeFor = (weekday: number) => {
+    const same = [...live].reverse().find((item) => weekdayOf(item.date) === weekday) ?? input.session;
+    return { startTime: same.startTime, endTime: same.endTime };
+  };
+  const pool = input.schedules.map((item) =>
+    item.id === input.session.id ? { ...item, status: 'cancelled' as const } : item
+  );
+  const from = last.date > input.today ? last.date : input.today;
+  for (let offset = 1; offset <= 28; offset += 1) {
+    const day = addDays(parseISO(`${from}T00:00:00`), offset);
+    if (!weekdays.has(getDay(day))) continue;
+    const candidate: ClassSession = {
+      id: input.createId(),
+      classId,
+      senseiId: input.senseiId,
+      studentIds: [...input.session.studentIds],
+      type: input.session.type,
+      level: input.session.level,
+      date: format(day, 'yyyy-MM-dd'),
+      ...timeFor(getDay(day)),
+      status: 'active',
+      makeupOfSessionId: null,
+      isExtra: false,
+      updatedAt: new Date().toISOString(),
+      updatedBy: input.updatedBy
+    };
+    if (!wouldConflict(pool, candidate)) return candidate;
+  }
+  return null;
 }
