@@ -3,6 +3,7 @@ import { AlertTriangle, CalendarRange, List as ListIcon } from 'lucide-react';
 import { CLASS_LEVELS, CLASS_TYPES, DAYS_OF_WEEK } from '../constants';
 import { formatDay, hoursBetween, toDateKey, weekDays } from '../lib/dates';
 import { displayName, senseiRail, TYPE_TONE } from '../lib/display';
+import { isSkippedSession } from '../lib/classProgress';
 import { findMakeupsOf, hasActiveOrCompletedMakeup, isMakeupSession, makeupLabel } from '../lib/makeup';
 import { addMinutesToTime } from '../lib/recurring';
 import { findConflicts } from '../lib/schedule';
@@ -59,6 +60,8 @@ export function ScheduleView() {
   const updateClass = useDashboardStore((state) => state.updateClass);
   const cancelClass = useDashboardStore((state) => state.cancelClass);
   const swapSensei = useDashboardStore((state) => state.swapSensei);
+  const skipSession = useDashboardStore((state) => state.skipSession);
+  const sessionReports = useDashboardStore((state) => state.sessionReports);
   const { schedules, sensei, students } = useScopedData();
   const days = weekDays(weekAnchor);
   const [editing, setEditing] = useState<ClassSession | null>(null);
@@ -70,6 +73,7 @@ export function ScheduleView() {
   const [initiator, setInitiator] = useState<CancellationInitiator>('Admin');
   const [replacementSecured, setReplacementSecured] = useState(false);
   const [swapTo, setSwapTo] = useState('');
+  const [skipReason, setSkipReason] = useState('');
   const [swapInitiator, setSwapInitiator] = useState<SwapInitiator>('Admin');
   const [detailMode, setDetailMode] = useState<'view' | 'edit'>('view');
   const [view, setView] = useState<'board' | 'list'>('board');
@@ -200,6 +204,7 @@ export function ScheduleView() {
       isExtra: Boolean(session.isExtra)
     });
     setCancelReason('');
+    setSkipReason('');
     setSwapTo('');
     setReplacementSecured(Boolean(session.replacementSecured));
   };
@@ -830,7 +835,47 @@ export function ScheduleView() {
                   </Button>
                 </div>
               ) : null}
-              {permissions.canEditOfficialSchedule && editing.status === 'cancelled' && !alreadyHasMakeup ? (
+              {permissions.canEditOfficialSchedule &&
+              editing.classId &&
+              !editing.isExtra &&
+              editing.status === 'active' &&
+              !sessionReports.some((item) => item.scheduleId === editing.id) ? (
+                <div className="rounded-xl border border-info/25 bg-info-soft p-3">
+                  <p className="ui-label">Izin / loncat sesi</p>
+                  <p className="mb-2 text-xs text-ink-soft">
+                    Sesi ini dilewati tapi tetap memakai nomor (misal 3/10 jadi 4/11). Sesi pengganti otomatis
+                    ditambahkan di akhir jadwal kelas, jadi jumlah pertemuan yang didapat tetap utuh.
+                  </p>
+                  <label>
+                    <span className="ui-label">
+                      Alasan izin <span className="text-danger">*</span>
+                    </span>
+                    <input
+                      className="ui-input"
+                      value={skipReason}
+                      onChange={(event) => setSkipReason(event.target.value)}
+                      placeholder="Contoh: Siswa izin sakit"
+                    />
+                  </label>
+                  <Button
+                    className="mt-2"
+                    tone="primary"
+                    disabled={!skipReason.trim()}
+                    onClick={() => {
+                      if (skipSession(editing.id, skipReason)) {
+                        setEditing(null);
+                        setSkipReason('');
+                      }
+                    }}
+                  >
+                    Izinkan &amp; loncat sesi
+                  </Button>
+                </div>
+              ) : null}
+              {permissions.canEditOfficialSchedule &&
+              editing.status === 'cancelled' &&
+              !isSkippedSession(editing) &&
+              !alreadyHasMakeup ? (
                 <div className="rounded-xl border border-info/25 bg-info-soft p-3">
                   <p className="ui-label">Replacement / Makeup</p>
                   <p className="mb-2 text-xs text-ink-soft">

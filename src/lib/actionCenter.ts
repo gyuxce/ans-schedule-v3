@@ -12,7 +12,7 @@ import type {
   Student
 } from '../types';
 import { WEEKLY_HOUR_TARGET } from '../constants';
-import { getClassHealth } from './classProgress';
+import { getClassHealth, getNotRunningStreak } from './classProgress';
 import { toDateKey, weekDays } from './dates';
 import {
   deriveEnrollmentDisplayStatus,
@@ -26,6 +26,8 @@ import { getWorkloadMetrics } from './workload';
 
 /** Session-level ops alerts only for recent window (not full history after V2 import). */
 const SESSION_ALERT_LOOKBACK_DAYS = 14;
+/** A class that stopped running long ago is history, not an alert. */
+const IDLE_CLASS_LOOKBACK_DAYS = 30;
 
 export function buildActionItems(input: {
   sensei: Sensei[];
@@ -47,6 +49,7 @@ export function buildActionItems(input: {
     input.weeklyHourTarget && input.weeklyHourTarget > 0 ? input.weeklyHourTarget : WEEKLY_HOUR_TARGET;
   const todayKey = toDateKey(now);
   const lookbackStart = toDateKey(addDays(now, -SESSION_ALERT_LOOKBACK_DAYS));
+  const idleLookbackStart = toDateKey(addDays(now, -IDLE_CLASS_LOOKBACK_DAYS));
   const weekEnd = toDateKey(weekDays(input.weekAnchor)[6]);
   const classMasters = input.classMasters ?? [];
   const enrollments = input.enrollments ?? [];
@@ -151,6 +154,24 @@ export function buildActionItems(input: {
         senseiId: teachingClass.senseiId,
         classId: teachingClass.id
       });
+    }
+    if (teachingClass.status === 'active' || teachingClass.status === 'ready') {
+      const idle = getNotRunningStreak(teachingClass.id, input.schedules, input.reports, todayKey);
+      const recent = idle.sessions[0]?.date;
+      if (idle.streak >= 2 && recent && recent >= idleLookbackStart) {
+        items.push({
+          id: `not_running:${teachingClass.id}`,
+          kind: 'class_not_running',
+          severity: idle.streak >= 3 ? 'high' : 'medium',
+          title: `${teachingClass.displayName} tidak berjalan ${idle.streak}x berturut-turut`,
+          detail: `Sesi terakhir yang tidak berjalan: ${idle.sessions
+            .slice(0, 3)
+            .map((session) => session.date)
+            .join(', ')}${idle.streak > 3 ? ' ...' : ''}`,
+          senseiId: teachingClass.senseiId,
+          classId: teachingClass.id
+        });
+      }
     }
   }
 

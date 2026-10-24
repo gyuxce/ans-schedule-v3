@@ -20,7 +20,8 @@ export type QaReviewStatus = 'Not Reviewed' | 'Reviewed';
 
 export type SessionWorkflowState = 'ready' | 'in_progress' | 'report_pending' | 'completed' | 'cancelled';
 
-export type CancellationInitiator = 'Sensei' | 'Admin' | 'Student' | 'Ops';
+/** 'Izin' marks a session skipped on purpose (loncat sesi): it keeps its number in "Sesi N dari Y". */
+export type CancellationInitiator = 'Sensei' | 'Admin' | 'Student' | 'Ops' | 'Izin';
 
 export type SwapInitiator = 'Sensei' | 'Admin' | 'Student';
 
@@ -332,7 +333,8 @@ export interface ActionItem {
     | 'hours_below_target'
     | 'low_availability'
     | 'ending_soon'
-    | 'overdue_class';
+    | 'overdue_class'
+    | 'class_not_running';
   severity: 'high' | 'medium' | 'low';
   title: string;
   detail: string;
