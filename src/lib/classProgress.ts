@@ -135,9 +135,13 @@ export function getSessionOrdinal(
   };
 }
 
-/** True when the session did not really take place: cancelled, or every student excused / absent. */
+/**
+ * True when the session really did not take place: skipped with izin, or reported
+ * with every student excused / absent. A plain cancellation (schedule fix, regenerate,
+ * class transfer) is a calendar change, not a miss.
+ */
 export function isNotRunSession(session: ClassSession, reports: SessionReport[]) {
-  if (session.status === 'cancelled') return true;
+  if (session.status === 'cancelled') return isSkippedSession(session);
   const report = reports.find((item) => item.scheduleId === session.id);
   return Boolean(
     report &&
@@ -148,7 +152,8 @@ export function isNotRunSession(session: ClassSession, reports: SessionReport[])
 
 /**
  * How many of the class's most recent past sessions in a row did not run.
- * A past session that ran (or whose report is simply missing) ends the streak.
+ * Plain cancelled sessions are ignored (neither counted nor breaking the streak);
+ * a past session that ran, or whose report is simply missing, ends it.
  */
 export function getNotRunningStreak(
   classId: string,
@@ -161,6 +166,7 @@ export function getNotRunningStreak(
     .sort((a, b) => `${b.date}${b.startTime}`.localeCompare(`${a.date}${a.startTime}`));
   const sessions: ClassSession[] = [];
   for (const session of past) {
+    if (session.status === 'cancelled' && !isSkippedSession(session)) continue;
     if (!isNotRunSession(session, reports)) break;
     sessions.push(session);
   }
