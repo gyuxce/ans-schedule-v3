@@ -87,13 +87,35 @@ describe('getNotRunningStreak', () => {
   it('counts the most recent past sessions that did not run', () => {
     const schedules = [
       session('a', '2026-10-05', { status: 'completed' }),
-      session('b', '2026-10-12', { status: 'cancelled', cancellationInitiator: 'Admin' }),
+      izin('b', '2026-10-12'),
       izin('c', '2026-10-19'),
       session('d', '2026-11-02')
     ];
     const result = getNotRunningStreak('c1', schedules, [report('a')], today);
     expect(result.streak).toBe(2);
     expect(result.sessions.map((item) => item.id)).toEqual(['c', 'b']);
+  });
+
+  it('ignores sessions cancelled as schedule corrections (neither counted nor breaking)', () => {
+    const fix = (id: string, date: string) =>
+      session(id, date, {
+        status: 'cancelled',
+        cancellationInitiator: 'Admin',
+        cancellationReason: 'Salah pola hari'
+      });
+    const onlyFixes = [
+      session('a', '2026-10-12', { status: 'completed' }),
+      fix('b', '2026-10-19'),
+      fix('c', '2026-10-22')
+    ];
+    expect(getNotRunningStreak('c1', onlyFixes, [report('a')], today).streak).toBe(0);
+    const between = [
+      izin('a', '2026-10-12'),
+      fix('b', '2026-10-15'),
+      izin('c', '2026-10-19'),
+      fix('d', '2026-10-22')
+    ];
+    expect(getNotRunningStreak('c1', between, [], today).streak).toBe(2);
   });
 
   it('is broken by a session that ran', () => {
