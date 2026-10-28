@@ -5,7 +5,11 @@ import { getClassHealth } from '../lib/classProgress';
 import { toDateKey, weekDays } from '../lib/dates';
 import { displayName } from '../lib/display';
 import { getSessionWorkflow, workflowLabel } from '../lib/session';
-import { deriveEnrollmentDisplayStatus, isCurrentEnrollmentStatus } from '../lib/enrollment';
+import {
+  deriveEnrollmentDisplayStatus,
+  isCurrentEnrollmentStatus,
+  isEnrollmentStale
+} from '../lib/enrollment';
 import { getWorkloadMetrics, formatPercent } from '../lib/workload';
 import { useDashboardStore, usePermissions, useScopedData } from '../store/useDashboardStore';
 import type { ActionItem, TabId } from '../types';
@@ -145,7 +149,8 @@ export function OverviewView() {
       (item) => item.status === 'active' || item.status === 'ready'
     ).length;
     const endingSoon = enrollments.filter((enrollment) => {
-      if (!isCurrentEnrollmentStatus(enrollment.status)) return false;
+      if (!isCurrentEnrollmentStatus(enrollment.status) || isEnrollmentStale(enrollment, classMasters))
+        return false;
       if (!permissions.canViewAllSchedules) {
         const student = scopedStudents.find((item) => item.id === enrollment.studentId);
         if (!student) return false;

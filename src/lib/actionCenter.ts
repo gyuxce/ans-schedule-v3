@@ -17,7 +17,8 @@ import { toDateKey, weekDays } from './dates';
 import {
   deriveEnrollmentDisplayStatus,
   getEnrollmentProgress,
-  isCurrentEnrollmentStatus
+  isCurrentEnrollmentStatus,
+  isEnrollmentStale
 } from './enrollment';
 import { getOperationalLabels } from './labels';
 import { findConflicts } from './schedule';
@@ -120,7 +121,8 @@ export function buildActionItems(input: {
   }
 
   for (const enrollment of enrollments) {
-    if (!isCurrentEnrollmentStatus(enrollment.status)) continue;
+    if (!isCurrentEnrollmentStatus(enrollment.status) || isEnrollmentStale(enrollment, classMasters))
+      continue;
     const display = deriveEnrollmentDisplayStatus(enrollment, input.schedules, input.reports, now);
     const progress = getEnrollmentProgress(enrollment, input.schedules, input.reports);
     const studentName = students.find((item) => item.id === enrollment.studentId)?.name ?? 'Siswa';

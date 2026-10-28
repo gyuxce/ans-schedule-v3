@@ -11,7 +11,7 @@ import { ATTENDANCE_TONE, displayName } from '../lib/display';
 import {
   deriveEnrollmentDisplayStatus,
   getEnrollmentProgress,
-  isCurrentEnrollmentStatus
+  pickCurrentEnrollment
 } from '../lib/enrollment';
 import { formatDay } from '../lib/dates';
 import { filterAcademicReportRows, isMakeupSession, makeupLabel } from '../lib/makeup';
@@ -85,8 +85,9 @@ export function StudentsView() {
   /** current enrollment + "mau habis" status per student */
   const studentRows = useMemo(() => {
     return students.map((student) => {
-      const current = enrollments.find(
-        (item) => item.studentId === student.id && isCurrentEnrollmentStatus(item.status)
+      const current = pickCurrentEnrollment(
+        enrollments.filter((item) => item.studentId === student.id),
+        classMasters
       );
       const display = current ? deriveEnrollmentDisplayStatus(current, schedules, sessionReports) : null;
       const ending = display === 'ending_soon' || current?.status === 'ending_soon';
@@ -98,7 +99,7 @@ export function StudentsView() {
         plannedEnd: current?.plannedEndDate ?? null
       };
     });
-  }, [students, enrollments, schedules, sessionReports]);
+  }, [students, enrollments, classMasters, schedules, sessionReports]);
 
   const endingCount = studentRows.filter((r) => r.ending).length;
 
@@ -138,8 +139,8 @@ export function StudentsView() {
       });
   }, [enrollments, selected]);
 
-  const currentEnrollment = studentEnrollments.find((item) => isCurrentEnrollmentStatus(item.status));
-  const learningHistory = studentEnrollments.filter((item) => !isCurrentEnrollmentStatus(item.status));
+  const currentEnrollment = pickCurrentEnrollment(studentEnrollments, classMasters);
+  const learningHistory = studentEnrollments.filter((item) => item.id !== currentEnrollment?.id);
 
   const currentProgress = currentEnrollment
     ? getEnrollmentProgress(currentEnrollment, schedules, sessionReports)

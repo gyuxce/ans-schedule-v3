@@ -9,6 +9,31 @@ export function isCurrentEnrollmentStatus(status: EnrollmentStatus) {
   return status === 'active' || status === 'ending_soon';
 }
 
+/** Still marked active, but its class is already completed or cancelled: a leftover that was never closed. */
+export function isEnrollmentStale(enrollment: Enrollment, classMasters: ClassMaster[]) {
+  if (!enrollment.classId) return false;
+  const teachingClass = classMasters.find((item) => item.id === enrollment.classId);
+  return teachingClass?.status === 'completed' || teachingClass?.status === 'cancelled';
+}
+
+/**
+ * The enrollment to show as a student's current one when several are marked active:
+ * not stale first, then one whose class is running, then the most recently started.
+ */
+export function pickCurrentEnrollment(enrollments: Enrollment[], classMasters: ClassMaster[]) {
+  const current = enrollments.filter((item) => isCurrentEnrollmentStatus(item.status));
+  const rank = (item: Enrollment) => {
+    if (isEnrollmentStale(item, classMasters)) return 2;
+    const teachingClass = classMasters.find((cm) => cm.id === item.classId);
+    return teachingClass?.status === 'active' || teachingClass?.status === 'ready' ? 0 : 1;
+  };
+  return [...current].sort((a, b) => {
+    const byRank = rank(a) - rank(b);
+    if (byRank !== 0) return byRank;
+    return (b.startDate || b.updatedAt || '').localeCompare(a.startDate || a.updatedAt || '');
+  })[0];
+}
+
 export function findActiveEnrollment(enrollments: Enrollment[], studentId: string, level?: string) {
   return enrollments.find(
     (item) =>
@@ -73,7 +98,8 @@ export function deriveEnrollmentDisplayStatus(
     (new Date(`${enrollment.plannedEndDate}T00:00:00`).getTime() - now.getTime()) / 86400000 <= 7;
 
   if (required > 0 && remaining != null && remaining > 0 && remaining <= 2) return 'ending_soon';
-  if (plannedSoon && (remaining == null || remaining > 0)) return 'ending_soon';
+  // A class that has not delivered a single session is not "almost finished", whatever its planned end says.
+  if (plannedSoon && completed > 0 && (remaining == null || remaining > 0)) return 'ending_soon';
   if (required > 0 && completed >= required)
     return enrollment.status === 'ending_soon' ? 'ending_soon' : 'active';
   return enrollment.status === 'ending_soon' ? 'active' : enrollment.status;

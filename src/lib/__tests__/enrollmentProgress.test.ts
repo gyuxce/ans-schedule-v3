@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { countEnrollmentSessionsCompleted } from '../enrollment';
-import type { ClassSession, Enrollment, SessionReport } from '../../types';
+import {
+  countEnrollmentSessionsCompleted,
+  deriveEnrollmentDisplayStatus,
+  isEnrollmentStale,
+  pickCurrentEnrollment
+} from '../enrollment';
+import type { ClassMaster, ClassSession, Enrollment, SessionReport } from '../../types';
 
 const enrollment: Enrollment = {
   id: 'e1',
@@ -56,5 +61,74 @@ describe('countEnrollmentSessionsCompleted', () => {
     expect(
       countEnrollmentSessionsCompleted({ ...enrollment, sessionsCompleted: 6 }, [session('a')], [])
     ).toBe(6);
+  });
+});
+
+describe('pickCurrentEnrollment / isEnrollmentStale', () => {
+  const cm = (id: string, status: ClassMaster['status']): ClassMaster => ({
+    id,
+    displayName: id,
+    type: 'Private',
+    level: 'N5',
+    senseiId: 's1',
+    studentIds: ['st1'],
+    requiredMeetings: 10,
+    sessionDurationMinutes: 90,
+    status
+  });
+  const enr = (id: string, classId: string, extra: Partial<Enrollment> = {}): Enrollment => ({
+    ...enrollment,
+    id,
+    classId,
+    ...extra
+  });
+  const classes = [cm('old', 'completed'), cm('live', 'active'), cm('draft', 'draft')];
+
+  it('flags an active enrollment whose class is completed or cancelled as stale', () => {
+    expect(isEnrollmentStale(enr('e1', 'old'), classes)).toBe(true);
+    expect(isEnrollmentStale(enr('e2', 'live'), classes)).toBe(false);
+    expect(isEnrollmentStale(enr('e3', 'missing'), classes)).toBe(false);
+    expect(isEnrollmentStale(enr('e4', ''), classes)).toBe(false);
+  });
+
+  it('prefers a running class over a stale one, whatever the array order', () => {
+    const list = [
+      enr('stale', 'old', { startDate: '2026-09-01' }),
+      enr('live', 'live', { startDate: '2026-07-01' })
+    ];
+    expect(pickCurrentEnrollment(list, classes)?.id).toBe('live');
+  });
+
+  it('takes the most recently started among equals and ignores closed enrollments', () => {
+    const list = [
+      enr('older', 'live', { startDate: '2026-07-01' }),
+      enr('newer', 'live', { startDate: '2026-10-01' }),
+      enr('done', 'live', { startDate: '2026-12-01', status: 'completed' })
+    ];
+    expect(pickCurrentEnrollment(list, classes)?.id).toBe('newer');
+  });
+
+  it('falls back to a stale enrollment when nothing else is active', () => {
+    expect(pickCurrentEnrollment([enr('stale', 'old')], classes)?.id).toBe('stale');
+    expect(pickCurrentEnrollment([], classes)).toBeUndefined();
+  });
+});
+
+describe('deriveEnrollmentDisplayStatus: planned end without progress', () => {
+  const now = new Date('2026-10-28T10:00:00');
+  const soon = { ...enrollment, plannedEndDate: '2026-11-03', requiredMeetings: 10, sessionsCompleted: 0 };
+
+  it('does not say "mau habis" when no session was delivered yet', () => {
+    expect(deriveEnrollmentDisplayStatus(soon, [], [], now)).toBe('active');
+  });
+
+  it('still says "mau habis" when sessions were delivered and the planned end is near', () => {
+    expect(deriveEnrollmentDisplayStatus({ ...soon, sessionsCompleted: 4 }, [], [], now)).toBe('ending_soon');
+  });
+
+  it('still says "mau habis" when 2 or fewer sessions remain', () => {
+    expect(
+      deriveEnrollmentDisplayStatus({ ...soon, plannedEndDate: null, sessionsCompleted: 8 }, [], [], now)
+    ).toBe('ending_soon');
   });
 });
