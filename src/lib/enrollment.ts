@@ -18,32 +18,33 @@ export function findActiveEnrollment(enrollments: Enrollment[], studentId: strin
   );
 }
 
+/**
+ * A session counts toward an enrollment when it belongs to the enrollment's class.
+ * The level label is only compared for sessions that are not tied to a class, since
+ * a Class Master edited after its sessions were generated can disagree with them.
+ */
+function sessionBelongsToEnrollment(session: ClassSession, enrollment: Enrollment) {
+  if (session.status === 'cancelled') return false;
+  if (!session.studentIds.includes(enrollment.studentId)) return false;
+  if (enrollment.classId && session.classId) return session.classId === enrollment.classId;
+  return session.level === enrollment.level;
+}
+
 export function countEnrollmentSessionsCompleted(
   enrollment: Enrollment,
   schedules: ClassSession[],
   reports: SessionReport[]
 ) {
-  if (typeof enrollment.sessionsCompleted === 'number' && enrollment.sessionsCompleted >= 0) {
-    // Prefer stored value when set by Ops, but never undercount completed reports for the journey.
-    const computed = schedules.filter((session) => {
-      if (session.status === 'cancelled') return false;
-      if (!session.studentIds.includes(enrollment.studentId)) return false;
-      if (session.level !== enrollment.level) return false;
-      if (enrollment.classId && session.classId && session.classId !== enrollment.classId) return false;
-      const report = reports.find((item) => item.scheduleId === session.id);
-      return Boolean(report) || session.status === 'completed';
-    }).length;
-    return Math.max(enrollment.sessionsCompleted, computed);
-  }
-
-  return schedules.filter((session) => {
-    if (session.status === 'cancelled') return false;
-    if (!session.studentIds.includes(enrollment.studentId)) return false;
-    if (session.level !== enrollment.level) return false;
-    if (enrollment.classId && session.classId && session.classId !== enrollment.classId) return false;
+  const computed = schedules.filter((session) => {
+    if (!sessionBelongsToEnrollment(session, enrollment)) return false;
     const report = reports.find((item) => item.scheduleId === session.id);
     return Boolean(report) || session.status === 'completed';
   }).length;
+  // Prefer the stored value when Ops set it, but never undercount completed reports for the journey.
+  if (typeof enrollment.sessionsCompleted === 'number' && enrollment.sessionsCompleted >= 0) {
+    return Math.max(enrollment.sessionsCompleted, computed);
+  }
+  return computed;
 }
 
 export function getEnrollmentProgress(
