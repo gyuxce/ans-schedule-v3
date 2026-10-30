@@ -1629,7 +1629,8 @@ export const useDashboardStore = create<DashboardStore>()(
           enrollments: state.enrollments,
           teachingClass: next,
           createId,
-          actorName: state.currentUser?.name
+          actorName: state.currentUser?.name,
+          previousRequiredMeetings: state.classMasters.find((item) => item.id === id)?.requiredMeetings
         });
         const today = toDateKey(new Date());
         const cancelledSessions =
