@@ -142,6 +142,10 @@ export function StudentsView() {
   const currentEnrollment = pickCurrentEnrollment(studentEnrollments, classMasters);
   const learningHistory = studentEnrollments.filter((item) => item.id !== currentEnrollment?.id);
 
+  const currentEnrollmentClass = currentEnrollment?.classId
+    ? classMasters.find((item) => item.id === currentEnrollment.classId)
+    : undefined;
+
   const currentProgress = currentEnrollment
     ? getEnrollmentProgress(currentEnrollment, schedules, sessionReports)
     : null;
@@ -424,6 +428,19 @@ export function StudentsView() {
                       Kelas:{' '}
                       {classMasters.find((item) => item.id === currentEnrollment.classId)?.displayName ||
                         currentEnrollment.classId.slice(0, 8)}
+                    </p>
+                  ) : null}
+                  {currentEnrollmentClass &&
+                  currentProgress &&
+                  currentEnrollmentClass.requiredMeetings !== currentProgress.required ? (
+                    <p className="text-xs text-ink-soft">
+                      Target kelas {currentEnrollmentClass.requiredMeetings} sesi · target siswa ini{' '}
+                      {currentProgress.required} sesi
+                      {currentEnrollment.startDate &&
+                      currentEnrollmentClass.startDate &&
+                      currentEnrollment.startDate > currentEnrollmentClass.startDate
+                        ? ' (masuk di tengah kelas, hanya menghitung sesi sejak bergabung)'
+                        : ' (edit enrollment kalau ingin disamakan dengan kelas)'}
                     </p>
                   ) : null}
                   {currentProgress && currentProgress.required > 0 ? (

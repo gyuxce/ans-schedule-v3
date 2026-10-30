@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   countEnrollmentSessionsCompleted,
   deriveEnrollmentDisplayStatus,
+  ensureClassEnrollments,
   isEnrollmentStale,
   pickCurrentEnrollment
 } from '../enrollment';
@@ -130,5 +131,57 @@ describe('deriveEnrollmentDisplayStatus: planned end without progress', () => {
     expect(
       deriveEnrollmentDisplayStatus({ ...soon, plannedEndDate: null, sessionsCompleted: 8 }, [], [], now)
     ).toBe('ending_soon');
+  });
+});
+
+describe('ensureClassEnrollments: class target changes', () => {
+  const teachingClass: ClassMaster = {
+    id: 'c1',
+    displayName: 'Private N5',
+    type: 'Private',
+    level: 'Guntai 3',
+    senseiId: 's1',
+    studentIds: ['st1', 'st2'],
+    requiredMeetings: 2,
+    sessionDurationMinutes: 90,
+    startDate: '2026-09-01',
+    status: 'ready'
+  };
+  const make = (studentId: string, requiredMeetings: number | null): Enrollment => ({
+    ...enrollment,
+    id: `e-${studentId}`,
+    studentId,
+    classId: 'c1',
+    requiredMeetings
+  });
+
+  it('moves enrollments that copied the old class target to the new one', () => {
+    const result = ensureClassEnrollments({
+      enrollments: [make('st1', 10), make('st2', 10)],
+      teachingClass,
+      createId: () => 'new',
+      previousRequiredMeetings: 10
+    });
+    expect(result.enrollments.map((item) => item.requiredMeetings)).toEqual([2, 2]);
+    expect(result.changed).toHaveLength(2);
+  });
+
+  it('keeps a target that was set on purpose (differs from the old class target)', () => {
+    const result = ensureClassEnrollments({
+      enrollments: [make('st1', 39), make('st2', 50)],
+      teachingClass: { ...teachingClass, requiredMeetings: 60 },
+      createId: () => 'new',
+      previousRequiredMeetings: 50
+    });
+    expect(result.enrollments.map((item) => item.requiredMeetings)).toEqual([39, 60]);
+  });
+
+  it('fills an empty target and leaves everything alone when no previous target is known', () => {
+    const empty = ensureClassEnrollments({
+      enrollments: [make('st1', null), make('st2', 10)],
+      teachingClass,
+      createId: () => 'new'
+    });
+    expect(empty.enrollments.map((item) => item.requiredMeetings)).toEqual([2, 10]);
   });
 });

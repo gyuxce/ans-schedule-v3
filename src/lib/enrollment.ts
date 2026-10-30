@@ -179,6 +179,8 @@ export function ensureClassEnrollments(input: {
   teachingClass: ClassMaster;
   createId: () => string;
   actorName?: string;
+  /** The class's target before this edit: enrollments that still carry it follow the new target. */
+  previousRequiredMeetings?: number | null;
 }): { enrollments: Enrollment[]; changed: Enrollment[] } {
   const now = new Date().toISOString();
   const startDate = input.teachingClass.startDate || todayIsoDate();
@@ -193,7 +195,13 @@ export function ensureClassEnrollments(input: {
         classId: input.teachingClass.id,
         senseiId: input.teachingClass.senseiId,
         classType: input.teachingClass.type,
-        requiredMeetings: activeSameLevel.requiredMeetings ?? input.teachingClass.requiredMeetings,
+        // A target set on purpose (e.g. a student who joined mid-class) differs from the old class
+        // target and is kept; one that merely copied the class target moves with it.
+        requiredMeetings:
+          activeSameLevel.requiredMeetings == null ||
+          activeSameLevel.requiredMeetings === input.previousRequiredMeetings
+            ? input.teachingClass.requiredMeetings
+            : activeSameLevel.requiredMeetings,
         plannedEndDate: activeSameLevel.plannedEndDate ?? input.teachingClass.plannedEndDate ?? null,
         updatedAt: now,
         updatedBy: input.actorName
