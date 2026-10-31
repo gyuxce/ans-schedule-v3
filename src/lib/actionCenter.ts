@@ -123,8 +123,14 @@ export function buildActionItems(input: {
   for (const enrollment of enrollments) {
     if (!isCurrentEnrollmentStatus(enrollment.status) || isEnrollmentStale(enrollment, classMasters))
       continue;
-    const display = deriveEnrollmentDisplayStatus(enrollment, input.schedules, input.reports, now);
-    const progress = getEnrollmentProgress(enrollment, input.schedules, input.reports);
+    const display = deriveEnrollmentDisplayStatus(
+      enrollment,
+      input.schedules,
+      input.reports,
+      now,
+      classMasters
+    );
+    const progress = getEnrollmentProgress(enrollment, input.schedules, input.reports, classMasters);
     const studentName = students.find((item) => item.id === enrollment.studentId)?.name ?? 'Siswa';
     if (display === 'ending_soon' && (progress.remaining == null || progress.remaining > 0)) {
       items.push({
