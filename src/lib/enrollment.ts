@@ -55,16 +55,50 @@ function sessionBelongsToEnrollment(session: ClassSession, enrollment: Enrollmen
   return session.level === enrollment.level;
 }
 
+const hasRun = (session: ClassSession, reports: SessionReport[]) =>
+  session.status === 'completed' || reports.some((item) => item.scheduleId === session.id);
+
+/**
+ * Sessions the student really had under an earlier class of the same level that was
+ * later cancelled and replaced by a new one: creating the new class re-links the
+ * enrollment to it, leaving the earlier sessions behind.
+ */
+function replacedClassSessions(
+  enrollment: Enrollment,
+  schedules: ClassSession[],
+  reports: SessionReport[],
+  classMasters: ClassMaster[]
+) {
+  const replaced = new Set(
+    classMasters
+      .filter(
+        (item) =>
+          item.status === 'cancelled' && item.level === enrollment.level && item.id !== enrollment.classId
+      )
+      .map((item) => item.id)
+  );
+  if (replaced.size === 0) return 0;
+  return schedules.filter(
+    (session) =>
+      session.status !== 'cancelled' &&
+      Boolean(session.classId && replaced.has(session.classId)) &&
+      session.studentIds.includes(enrollment.studentId) &&
+      (!enrollment.startDate || session.date >= enrollment.startDate) &&
+      hasRun(session, reports)
+  ).length;
+}
+
 export function countEnrollmentSessionsCompleted(
   enrollment: Enrollment,
   schedules: ClassSession[],
-  reports: SessionReport[]
+  reports: SessionReport[],
+  classMasters: ClassMaster[] = []
 ) {
-  const computed = schedules.filter((session) => {
-    if (!sessionBelongsToEnrollment(session, enrollment)) return false;
-    const report = reports.find((item) => item.scheduleId === session.id);
-    return Boolean(report) || session.status === 'completed';
-  }).length;
+  let computed = schedules.filter(
+    (session) => sessionBelongsToEnrollment(session, enrollment) && hasRun(session, reports)
+  ).length;
+  // Only when the linked class has nothing yet: a class replaced by a new one keeps the sessions already held.
+  if (computed === 0) computed = replacedClassSessions(enrollment, schedules, reports, classMasters);
   // Prefer the stored value when Ops set it, but never undercount completed reports for the journey.
   if (typeof enrollment.sessionsCompleted === 'number' && enrollment.sessionsCompleted >= 0) {
     return Math.max(enrollment.sessionsCompleted, computed);
@@ -75,10 +109,11 @@ export function countEnrollmentSessionsCompleted(
 export function getEnrollmentProgress(
   enrollment: Enrollment,
   schedules: ClassSession[],
-  reports: SessionReport[]
+  reports: SessionReport[],
+  classMasters: ClassMaster[] = []
 ) {
   const required = Math.max(0, enrollment.requiredMeetings ?? 0);
-  const completed = countEnrollmentSessionsCompleted(enrollment, schedules, reports);
+  const completed = countEnrollmentSessionsCompleted(enrollment, schedules, reports, classMasters);
   const remaining = required > 0 ? Math.max(required - completed, 0) : null;
   return { required, completed, remaining };
 }
@@ -87,10 +122,16 @@ export function deriveEnrollmentDisplayStatus(
   enrollment: Enrollment,
   schedules: ClassSession[],
   reports: SessionReport[],
-  now = new Date()
+  now = new Date(),
+  classMasters: ClassMaster[] = []
 ): EnrollmentStatus {
   if (!isCurrentEnrollmentStatus(enrollment.status)) return enrollment.status;
-  const { required, completed, remaining } = getEnrollmentProgress(enrollment, schedules, reports);
+  const { required, completed, remaining } = getEnrollmentProgress(
+    enrollment,
+    schedules,
+    reports,
+    classMasters
+  );
   const today = toDateKey(now);
   const plannedSoon =
     Boolean(enrollment.plannedEndDate) &&

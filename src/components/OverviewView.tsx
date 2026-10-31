@@ -156,8 +156,8 @@ export function OverviewView() {
         if (!student) return false;
       }
       return (
-        deriveEnrollmentDisplayStatus(enrollment, classSchedules, classReports) === 'ending_soon' ||
-        enrollment.status === 'ending_soon'
+        deriveEnrollmentDisplayStatus(enrollment, classSchedules, classReports, new Date(), classMasters) ===
+          'ending_soon' || enrollment.status === 'ending_soon'
       );
     }).length;
     const endingSoonClasses = classMasters.filter(

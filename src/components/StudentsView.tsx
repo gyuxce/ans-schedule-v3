@@ -89,9 +89,13 @@ export function StudentsView() {
         enrollments.filter((item) => item.studentId === student.id),
         classMasters
       );
-      const display = current ? deriveEnrollmentDisplayStatus(current, schedules, sessionReports) : null;
+      const display = current
+        ? deriveEnrollmentDisplayStatus(current, schedules, sessionReports, new Date(), classMasters)
+        : null;
       const ending = display === 'ending_soon' || current?.status === 'ending_soon';
-      const progress = current ? getEnrollmentProgress(current, schedules, sessionReports) : null;
+      const progress = current
+        ? getEnrollmentProgress(current, schedules, sessionReports, classMasters)
+        : null;
       return {
         student,
         ending: Boolean(ending && student.isActive),
@@ -147,10 +151,10 @@ export function StudentsView() {
     : undefined;
 
   const currentProgress = currentEnrollment
-    ? getEnrollmentProgress(currentEnrollment, schedules, sessionReports)
+    ? getEnrollmentProgress(currentEnrollment, schedules, sessionReports, classMasters)
     : null;
   const currentDisplayStatus = currentEnrollment
-    ? deriveEnrollmentDisplayStatus(currentEnrollment, schedules, sessionReports)
+    ? deriveEnrollmentDisplayStatus(currentEnrollment, schedules, sessionReports, new Date(), classMasters)
     : null;
 
   const openCreateStudent = () => {

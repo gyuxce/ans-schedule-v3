@@ -185,3 +185,63 @@ describe('ensureClassEnrollments: class target changes', () => {
     expect(empty.enrollments.map((item) => item.requiredMeetings)).toEqual([2, 10]);
   });
 });
+
+describe('countEnrollmentSessionsCompleted: class replaced by a new one', () => {
+  const cm = (id: string, status: ClassMaster['status'], level = 'Guntai 3'): ClassMaster => ({
+    id,
+    displayName: id,
+    type: 'Private',
+    level,
+    senseiId: 's1',
+    studentIds: ['st1'],
+    requiredMeetings: 4,
+    sessionDurationMinutes: 90,
+    status
+  });
+  const linked = {
+    ...enrollment,
+    classId: 'new',
+    startDate: '2026-10-03',
+    requiredMeetings: 4
+  } as Enrollment;
+  const held = (id: string, date: string, extra: Partial<ClassSession> = {}) =>
+    session(id, { classId: 'old', level: 'Guntai 3', date, ...extra });
+  const classes = [cm('old', 'cancelled'), cm('new', 'active')];
+  const sessions = [held('a', '2026-10-09'), held('b', '2026-10-18'), held('c', '2026-10-24')];
+
+  it('counts sessions held under the earlier cancelled class of the same level', () => {
+    expect(countEnrollmentSessionsCompleted(linked, sessions, [], classes)).toBe(3);
+  });
+
+  it('does not use the fallback when the linked class already has sessions', () => {
+    const own = session('own', { classId: 'new', level: 'Guntai 3', date: '2026-10-30' });
+    expect(countEnrollmentSessionsCompleted(linked, [...sessions, own], [], classes)).toBe(1);
+  });
+
+  it('ignores earlier classes that are not cancelled, other levels, other students and older dates', () => {
+    expect(
+      countEnrollmentSessionsCompleted(linked, sessions, [], [cm('old', 'completed'), cm('new', 'active')])
+    ).toBe(0);
+    expect(
+      countEnrollmentSessionsCompleted(
+        linked,
+        sessions,
+        [],
+        [cm('old', 'cancelled', 'N5'), cm('new', 'active')]
+      )
+    ).toBe(0);
+    expect(
+      countEnrollmentSessionsCompleted(
+        linked,
+        sessions.map((item) => ({ ...item, studentIds: ['st9'] })),
+        [],
+        classes
+      )
+    ).toBe(0);
+    expect(countEnrollmentSessionsCompleted(linked, [held('x', '2026-09-20')], [], classes)).toBe(0);
+  });
+
+  it('keeps working without class masters (nothing to look up)', () => {
+    expect(countEnrollmentSessionsCompleted(linked, sessions, [])).toBe(0);
+  });
+});
