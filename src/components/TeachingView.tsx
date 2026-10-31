@@ -450,6 +450,8 @@ function SessionDrawer(props: {
   const { classReports } = useScopedData();
   const teachingClass = classMasters.find((item) => item.id === props.session.classId);
   const ordinal = getSessionOrdinal(props.session, schedules, teachingClass, classReports);
+  // A past session nobody clocked in for: the report is the only record left, so it may be filed without a clock-out.
+  const missedClock = props.state === 'ready' && props.session.date < toDateKey(new Date());
   const previousMaterials = useMemo(() => {
     const classId = props.session.classId;
     if (!classId) return [];
@@ -504,9 +506,10 @@ function SessionDrawer(props: {
       {ordinal && ordinal.unreportedBefore > 0 ? (
         <p className="rounded-xl border border-warn/25 bg-warn-soft px-3 py-2 text-sm text-ink">
           {ordinal.unreportedBefore} sesi sebelumnya belum ada laporan, jadi urutan kalender (Sesi{' '}
-          {ordinal.index}) lebih besar dari progres selesai ({ordinal.completed}/{ordinal.required}). Rapikan
-          sesi lama di Jadwal Resmi: batalkan kalau memang tidak terlaksana, atau isi laporannya kalau sudah
-          berlangsung.
+          {ordinal.index}) lebih besar dari progres selesai ({ordinal.completed}/{ordinal.required}).{' '}
+          {props.canOverride
+            ? 'Rapikan sesi lama di Jadwal Resmi: batalkan kalau memang tidak terlaksana, atau isi laporannya kalau sudah berlangsung.'
+            : 'Buka sesi lama itu dan isi laporannya kalau sudah berlangsung. Kalau tidak terlaksana, minta Admin membatalkannya.'}
         </p>
       ) : null}
       {previousMaterials.length > 0 ? (
@@ -545,7 +548,7 @@ function SessionDrawer(props: {
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        {props.canOperate && props.state === 'ready' ? (
+        {props.canOperate && props.state === 'ready' && !missedClock ? (
           <Button tone="primary" onClick={props.onClockIn}>
             Clock in
           </Button>
@@ -700,7 +703,7 @@ function SessionDrawer(props: {
           tone="primary"
           disabled={
             !materialCovered ||
-            props.state === 'ready' ||
+            (props.state === 'ready' && !missedClock) ||
             props.state === 'in_progress' ||
             props.state === 'cancelled'
           }
@@ -764,7 +767,11 @@ function SessionDrawer(props: {
           </div>
         </div>
       ) : null}
-      {props.state === 'ready' || props.state === 'in_progress' ? (
+      {missedClock ? (
+        <p className="text-xs text-ink-soft">
+          Sesi ini sudah lewat tanpa clock in/out. Laporan susulan tetap bisa disimpan di sini.
+        </p>
+      ) : props.state === 'ready' || props.state === 'in_progress' ? (
         <p className="text-xs text-ink-soft">Laporan hanya bisa dikirim setelah clock-out.</p>
       ) : null}
     </Modal>
