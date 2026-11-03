@@ -14,12 +14,15 @@ import { classCompositionError } from '../lib/classComposition';
 import { computeProjectedEndDate } from '../lib/classProgress';
 import {
   cancelUpcomingSessionsOfClass,
+  findOverlappingClasses,
   findSameDayDuplicate,
+  planClassReactivation,
   planClassTakeOver,
   planSkipReplacement,
   syncUpcomingSessionStudents
 } from '../lib/classSync';
 import { toDateKey } from '../lib/dates';
+import { CLASS_CANCELLED_REASON, classifyRemoteError } from '../lib/remoteError';
 import { addMinutesToTime, generateRecurringDates, suggestPlannedEndDate } from '../lib/recurring';
 import { previewConflicts, buildRecurringPreview } from '../lib/schedulePreview';
 import {
@@ -115,7 +118,28 @@ async function safeRemote(task: () => Promise<void>, label: string) {
     await task();
   } catch (error) {
     console.error(error);
-    toast.error(`${label}: ${error instanceof Error ? error.message : 'gagal menyimpan'}`);
+    const message = error instanceof Error ? error.message : 'gagal menyimpan';
+    const session = await getSupabase()
+      ?.auth.getSession()
+      .then((result) => result.data.session)
+      .catch(() => null);
+    const { kind, text } = classifyRemoteError(message, Boolean(session));
+    if (kind === 'other') {
+      toast.error(`${label}: ${message}`);
+      return;
+    }
+    // The screen already shows the change, so a refused write must not look like a saved one.
+    // No automatic reload: with an expired login it would replace the view with empty data.
+    toast.error(`${label}: ${text}`, {
+      duration: 60_000,
+      action:
+        kind === 'session'
+          ? { label: 'Login ulang', onClick: () => void useDashboardStore.getState().logout() }
+          : {
+              label: 'Muat ulang data',
+              onClick: () => void useDashboardStore.getState().hydrateFromSupabase()
+            }
+    });
   }
 }
 
@@ -253,6 +277,10 @@ interface DashboardStore extends DashboardSnapshot {
   deleteSensei: (senseiId: string) => Promise<boolean>;
   deleteStudent: (studentId: string) => Promise<boolean>;
   deleteClassMaster: (classId: string) => Promise<boolean>;
+}
+
+function sameStudents(a: string[], b: string[]) {
+  return a.length === b.length && a.every((id) => b.includes(id));
 }
 
 function actor(state: DashboardStore) {
@@ -716,7 +744,18 @@ export const useDashboardStore = create<DashboardStore>()(
           for (const enrollment of ensured.changed) await upsertEnrollmentRemote(enrollment);
           for (const session of created) await upsertScheduleRemote(session);
         }, 'Simpan kelas & jadwal berulang');
+        const overlappingNew = findOverlappingClasses(state.classMasters, {
+          id: classId,
+          level: input.level,
+          studentIds: input.studentIds
+        });
         toast.success(`1 kelas + ${created.length} sesi disimpan (${preview[0]?.date} → ${plannedEnd})`);
+        if (overlappingNew.length) {
+          toast.warning(
+            `Siswa yang sama sudah ada di kelas aktif ${overlappingNew.map((item) => item.displayName).join(', ')} (level ${input.level}). Kalau kelas baru ini pengganti, batalkan kelas lama supaya tidak ada kelas ganda.`,
+            { duration: 20000 }
+          );
+        }
         return true;
       },
       createExtraSession: (input, reason) => {
@@ -1640,7 +1679,7 @@ export const useDashboardStore = create<DashboardStore>()(
                 reports: state.sessionReports,
                 classId: id,
                 today,
-                reason: 'Class Master dibatalkan',
+                reason: CLASS_CANCELLED_REASON,
                 updatedBy: state.currentUser?.name
               })
             : [];
@@ -1655,7 +1694,35 @@ export const useDashboardStore = create<DashboardStore>()(
                 updatedBy: state.currentUser?.name
               })
             : [];
-        const touchedSessions = [...syncedSessions, ...cancelledSessions];
+        const reactivation =
+          input.id && (next.status === 'active' || next.status === 'ready')
+            ? planClassReactivation({
+                schedules: state.schedules,
+                reports: state.sessionReports,
+                classId: id,
+                today,
+                updatedBy: state.currentUser?.name
+              })
+            : { restored: [], blocked: [] };
+        const restoredIds = new Set(reactivation.restored.map((item) => item.id));
+        // A restored session also takes the class's current students.
+        const restoredSessions = reactivation.restored.map((item) =>
+          sameStudents(item.studentIds, next.studentIds)
+            ? item
+            : { ...item, studentIds: [...next.studentIds] }
+        );
+        const touchedSessions = [
+          ...syncedSessions.filter((item) => !restoredIds.has(item.id)),
+          ...restoredSessions,
+          ...cancelledSessions
+        ];
+        const overlapping = input.id
+          ? []
+          : findOverlappingClasses(state.classMasters, {
+              id,
+              level: next.level,
+              studentIds: next.studentIds
+            });
         const syncedById = new Map(touchedSessions.map((item) => [item.id, item]));
         set((current) => {
           const exists = current.classMasters.some((item) => item.id === id);
@@ -1667,7 +1734,8 @@ export const useDashboardStore = create<DashboardStore>()(
               class: next,
               enrollmentIds: ensured.changed.map((item) => item.id),
               sessionsSynced: syncedSessions.length,
-              sessionsCancelled: cancelledSessions.length
+              sessionsCancelled: cancelledSessions.length,
+              sessionsRestored: restoredSessions.length
             }
           });
           return {
@@ -1688,12 +1756,29 @@ export const useDashboardStore = create<DashboardStore>()(
           }
           for (const session of touchedSessions) await upsertScheduleRemote(session);
         }, 'Simpan Class Master');
+        if (reactivation.blocked.length) {
+          toast.warning(
+            `${reactivation.blocked.length} sesi mendatang tidak dipulihkan karena bentrok dengan jadwal Sensei (${reactivation.blocked
+              .slice(0, 3)
+              .map((item) => `${item.date} ${item.startTime}`)
+              .join(', ')}). Cek di Jadwal Resmi.`,
+            { duration: 20000 }
+          );
+        }
+        if (overlapping.length) {
+          toast.warning(
+            `Siswa yang sama sudah ada di kelas aktif ${overlapping.map((item) => item.displayName).join(', ')} (level ${next.level}). Kalau kelas baru ini pengganti, batalkan kelas lama supaya tidak ada kelas ganda.`,
+            { duration: 20000 }
+          );
+        }
         toast.success(
-          cancelledSessions.length
-            ? `Class Master disimpan · ${cancelledSessions.length} sesi mendatang ikut dibatalkan`
-            : syncedSessions.length
-              ? `Class Master disimpan · daftar siswa di ${syncedSessions.length} sesi mendatang ikut diperbarui`
-              : 'Class Master disimpan'
+          restoredSessions.length
+            ? `Class Master disimpan · ${restoredSessions.length} sesi mendatang dipulihkan`
+            : cancelledSessions.length
+              ? `Class Master disimpan · ${cancelledSessions.length} sesi mendatang ikut dibatalkan`
+              : syncedSessions.length
+                ? `Class Master disimpan · daftar siswa di ${syncedSessions.length} sesi mendatang ikut diperbarui`
+                : 'Class Master disimpan'
         );
         return id;
       },
