@@ -1801,6 +1801,13 @@ export const useDashboardStore = create<DashboardStore>()(
         toast.success(
           `${classes.length} kelas diambil alih ${incoming.name} · ${moved.length} sesi mendatang dipindahkan`
         );
+        const empty = classes.filter((item) => !moved.some((session) => session.classId === item.id));
+        if (empty.length) {
+          toast.warning(
+            `${empty.map((item) => item.displayName).join(', ')}: tidak ada sesi mulai ${effectiveDate} yang bisa dipindahkan, jadi kalender ${incoming.name} masih kosong. Generate jadwal dari Class Master kelas ini (jangan buat kelas baru).`,
+            { duration: 20000 }
+          );
+        }
         return true;
       },
       generateClassSchedule: ({ classId, startDate, weekdays, startTime, meetings }) => {
