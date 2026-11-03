@@ -1,5 +1,6 @@
 import { addDays, format, getDay, parseISO } from 'date-fns';
-import type { ClassSession, SessionReport } from '../types';
+import type { ClassMaster, ClassSession, SessionReport } from '../types';
+import { CLASS_CANCELLED_REASON } from './remoteError';
 import { wouldConflict } from './schedule';
 
 function sameIds(a: string[], b: string[]) {
@@ -115,6 +116,66 @@ export function findSameDayDuplicate(
       (candidate.classId == null || session.classId !== candidate.classId) &&
       session.studentIds.some((id) => candidate.studentIds.includes(id))
   );
+}
+
+/** Another live (active/ready) class at the same level that shares a student: usually a class entered twice. */
+export function findOverlappingClasses(
+  classMasters: ClassMaster[],
+  candidate: { id?: string; level: string; studentIds: string[] }
+) {
+  return classMasters.filter(
+    (item) =>
+      item.id !== candidate.id &&
+      (item.status === 'active' || item.status === 'ready') &&
+      item.level === candidate.level &&
+      item.studentIds.some((id) => candidate.studentIds.includes(id))
+  );
+}
+
+/**
+ * Upcoming sessions that were cancelled only because their Class Master was cancelled,
+ * brought back when the class is live again. A session the Sensei can no longer teach
+ * (clash with something booked since) stays cancelled and is reported back.
+ */
+export function planClassReactivation(input: {
+  schedules: ClassSession[];
+  reports: SessionReport[];
+  classId: string;
+  today: string;
+  updatedBy?: string;
+}): { restored: ClassSession[]; blocked: ClassSession[] } {
+  const updatedAt = new Date().toISOString();
+  const candidates = input.schedules
+    .filter(
+      (session) =>
+        session.classId === input.classId &&
+        session.status === 'cancelled' &&
+        session.cancellationReason === CLASS_CANCELLED_REASON &&
+        session.date >= input.today &&
+        !input.reports.some((report) => report.scheduleId === session.id)
+    )
+    .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`));
+  let pool = input.schedules;
+  const restored: ClassSession[] = [];
+  const blocked: ClassSession[] = [];
+  for (const session of candidates) {
+    const revived: ClassSession = {
+      ...session,
+      status: 'active',
+      cancellationReason: null,
+      cancellationInitiator: null,
+      replacementSecured: null,
+      updatedAt,
+      updatedBy: input.updatedBy
+    };
+    if (wouldConflict(pool, revived)) {
+      blocked.push(session);
+      continue;
+    }
+    pool = pool.map((item) => (item.id === session.id ? revived : item));
+    restored.push(revived);
+  }
+  return { restored, blocked };
 }
 
 const weekdayOf = (date: string) => getDay(parseISO(`${date}T00:00:00`));
