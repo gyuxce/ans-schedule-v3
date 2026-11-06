@@ -473,6 +473,11 @@ export const useDashboardStore = create<DashboardStore>()(
           return;
         }
 
+        if (slot.isActive && slot.endTime <= slot.startTime) {
+          toast.error('Jam selesai harus setelah jam mulai. Ketersediaan tidak disimpan.');
+          return;
+        }
+
         const id = slot.id && isUuid(slot.id) ? slot.id : createId();
         const next = {
           ...slot,

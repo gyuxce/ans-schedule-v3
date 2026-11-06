@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import { compactTimeRange, isToday, toDateKey, weekdayOf } from '../../lib/dates';
 import { jlptLevels } from '../../lib/labels';
-import { formatHoursShort, getDayCapacity } from '../../lib/workload';
+import { formatHoursShort, getDayCapacity, isValidSlot } from '../../lib/workload';
 import type { AvailabilitySlot, ClassSession } from '../../types';
 import { Avatar } from './Avatar';
 import { Badge } from './Badge';
@@ -102,7 +102,7 @@ export function CapacityHeatmap({
                 const cap = getDayCapacity(item.id, dateKey, availability, schedules);
                 const today = isToday(dateKey);
                 const editable = canEdit(item.id);
-                const closed = cap.availableHours <= 0;
+                const closed = cap.slots.length === 0;
                 const over = cap.assignedHours > cap.availableHours && cap.availableHours > 0;
                 const fill = cap.availableHours > 0 ? Math.min(cap.assignedHours / cap.availableHours, 1) : 0;
                 return (
@@ -145,7 +145,11 @@ export function CapacityHeatmap({
                         <>
                           <div className="px-1 pt-1 text-[11px] font-semibold text-ink">
                             {cap.slots
-                              .map((slot) => compactTimeRange(slot.startTime, slot.endTime))
+                              .map(
+                                (slot) =>
+                                  compactTimeRange(slot.startTime, slot.endTime) +
+                                  (isValidSlot(slot) ? '' : ' (jam terbalik)')
+                              )
                               .join(' · ')}
                           </div>
                           <div className="px-1 text-[10px] font-semibold text-ink-soft">
