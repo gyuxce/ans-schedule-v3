@@ -2,6 +2,11 @@ import type { AvailabilitySlot, ClassSession, WorkloadMetrics } from '../types';
 import { WEEKLY_HOUR_TARGET } from '../constants';
 import { hoursBetween, toDateKey, weekdayOf, weekDays } from './dates';
 
+/** A slot that ends after it starts. Reversed ones come from an AM/PM slip and must not eat the valid hours. */
+export function isValidSlot(slot: Pick<AvailabilitySlot, 'startTime' | 'endTime'>) {
+  return slot.endTime > slot.startTime;
+}
+
 export function slotsOnDate(slots: AvailabilitySlot[], senseiId: string, dateKey: string) {
   const weekday = weekdayOf(dateKey);
   return slots.filter((slot) => {
@@ -25,7 +30,9 @@ export function getDayCapacity(
 ) {
   const daySlots = slotsOnDate(slots, senseiId, dateKey);
   const daySessions = sessionsOnDate(schedules, senseiId, dateKey);
-  const availableHours = daySlots.reduce((sum, slot) => sum + hoursBetween(slot.startTime, slot.endTime), 0);
+  const availableHours = daySlots
+    .filter(isValidSlot)
+    .reduce((sum, slot) => sum + hoursBetween(slot.startTime, slot.endTime), 0);
   const assignedHours = daySessions.reduce(
     (sum, session) => sum + hoursBetween(session.startTime, session.endTime),
     0
@@ -51,7 +58,7 @@ export function availabilityHoursForWeek(
     const dateKey = toDateKey(day);
     const weekday = weekdayOf(dateKey);
     for (const slot of slots) {
-      if (!slot.isActive || slot.senseiId !== senseiId) continue;
+      if (!slot.isActive || slot.senseiId !== senseiId || !isValidSlot(slot)) continue;
       const matches =
         (slot.pattern === 'specific_date' && slot.date === dateKey) ||
         (slot.pattern === 'weekly' && slot.weekday === weekday);

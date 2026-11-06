@@ -143,6 +143,12 @@ export function AvailabilityView() {
                     toast.error('Sensei belum tertaut / belum dipilih.');
                     return;
                   }
+                  if (form.endTime <= form.startTime) {
+                    toast.error(
+                      'Jam selesai harus setelah jam mulai. Cek AM/PM atau gunakan format 24 jam (contoh 19:00 sampai 21:00).'
+                    );
+                    return;
+                  }
                   upsertAvailability({
                     senseiId: targetId,
                     pattern: form.pattern,
