@@ -23,6 +23,7 @@ import {
 } from '../lib/classSync';
 import { timesOverlap, toDateKey } from '../lib/dates';
 import { CLASS_CANCELLED_REASON, classifyRemoteError } from '../lib/remoteError';
+import { normalizeRecordingStatus } from '../lib/recording';
 import { addMinutesToTime, generateRecurringDates, suggestPlannedEndDate } from '../lib/recurring';
 import { previewConflicts, buildRecurringPreview } from '../lib/schedulePreview';
 import {
@@ -1093,7 +1094,8 @@ export const useDashboardStore = create<DashboardStore>()(
             qaReviewerId: existing?.qaReviewerId,
             qaReviewedAt: existing?.qaReviewedAt,
             qaReviewNotes: existing?.qaReviewNotes,
-            ...payload
+            ...payload,
+            recordingStatus: normalizeRecordingStatus(payload.recordingUrl, payload.recordingStatus)
           };
           savedReport = report;
           const schedules = current.schedules.map((item) => {
