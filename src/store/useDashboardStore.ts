@@ -14,14 +14,14 @@ import { classCompositionError } from '../lib/classComposition';
 import { computeProjectedEndDate } from '../lib/classProgress';
 import {
   cancelUpcomingSessionsOfClass,
-  findOverlappingClasses,
+  duplicateClassError,
   findSameDayDuplicate,
   planClassReactivation,
   planClassTakeOver,
   planSkipReplacement,
   syncUpcomingSessionStudents
 } from '../lib/classSync';
-import { toDateKey } from '../lib/dates';
+import { timesOverlap, toDateKey } from '../lib/dates';
 import { CLASS_CANCELLED_REASON, classifyRemoteError } from '../lib/remoteError';
 import { addMinutesToTime, generateRecurringDates, suggestPlannedEndDate } from '../lib/recurring';
 import { previewConflicts, buildRecurringPreview } from '../lib/schedulePreview';
@@ -653,6 +653,15 @@ export const useDashboardStore = create<DashboardStore>()(
           toast.error(recurringCompositionError);
           return false;
         }
+        const duplicateError = duplicateClassError(state.classMasters, {
+          level: input.level,
+          type: input.type,
+          studentIds: input.studentIds
+        });
+        if (duplicateError) {
+          toast.error(duplicateError, { duration: 20000 });
+          return false;
+        }
         if (input.weekdays.length === 0) {
           toast.error('Pilih minimal 1 hari berulang');
           return false;
@@ -749,18 +758,7 @@ export const useDashboardStore = create<DashboardStore>()(
           for (const enrollment of ensured.changed) await upsertEnrollmentRemote(enrollment);
           for (const session of created) await upsertScheduleRemote(session);
         }, 'Simpan kelas & jadwal berulang');
-        const overlappingNew = findOverlappingClasses(state.classMasters, {
-          id: classId,
-          level: input.level,
-          studentIds: input.studentIds
-        });
         toast.success(`1 kelas + ${created.length} sesi disimpan (${preview[0]?.date} → ${plannedEnd})`);
-        if (overlappingNew.length) {
-          toast.warning(
-            `Siswa yang sama sudah ada di kelas aktif ${overlappingNew.map((item) => item.displayName).join(', ')} (level ${input.level}). Kalau kelas baru ini pengganti, batalkan kelas lama supaya tidak ada kelas ganda.`,
-            { duration: 20000 }
-          );
-        }
         return true;
       },
       createExtraSession: (input, reason) => {
@@ -1660,6 +1658,17 @@ export const useDashboardStore = create<DashboardStore>()(
           toast.error(compositionError);
           return null;
         }
+        if (!input.id || !state.classMasters.some((item) => item.id === input.id)) {
+          const duplicateError = duplicateClassError(state.classMasters, {
+            level: input.level,
+            type: input.type,
+            studentIds: input.studentIds
+          });
+          if (duplicateError) {
+            toast.error(duplicateError, { duration: 20000 });
+            return null;
+          }
+        }
         const id = input.id ?? createId();
         const next: ClassMaster = {
           ...input,
@@ -1721,13 +1730,6 @@ export const useDashboardStore = create<DashboardStore>()(
           ...restoredSessions,
           ...cancelledSessions
         ];
-        const overlapping = input.id
-          ? []
-          : findOverlappingClasses(state.classMasters, {
-              id,
-              level: next.level,
-              studentIds: next.studentIds
-            });
         const syncedById = new Map(touchedSessions.map((item) => [item.id, item]));
         set((current) => {
           const exists = current.classMasters.some((item) => item.id === id);
@@ -1767,12 +1769,6 @@ export const useDashboardStore = create<DashboardStore>()(
               .slice(0, 3)
               .map((item) => `${item.date} ${item.startTime}`)
               .join(', ')}). Cek di Jadwal Resmi.`,
-            { duration: 20000 }
-          );
-        }
-        if (overlapping.length) {
-          toast.warning(
-            `Siswa yang sama sudah ada di kelas aktif ${overlapping.map((item) => item.displayName).join(', ')} (level ${next.level}). Kalau kelas baru ini pengganti, batalkan kelas lama supaya tidak ada kelas ganda.`,
             { duration: 20000 }
           );
         }
@@ -1935,7 +1931,23 @@ export const useDashboardStore = create<DashboardStore>()(
             updatedBy: state.currentUser?.name
           };
           if (wouldConflict([...state.schedules, ...created], session)) {
-            toast.error(`Bentrok di ${date} ${startTime}. Generate dibatalkan.`);
+            const clash = state.schedules.find(
+              (other) =>
+                other.status !== 'cancelled' &&
+                other.senseiId === session.senseiId &&
+                other.date === date &&
+                other.classId !== classId &&
+                timesOverlap(other.startTime, other.endTime, startTime, endTime)
+            );
+            const clashClass = clash?.classId
+              ? state.classMasters.find((item) => item.id === clash.classId)
+              : undefined;
+            toast.error(
+              clashClass && clash && clash.studentIds.some((id) => session.studentIds.includes(id))
+                ? `Bentrok di ${date} ${startTime}: jadwal itu sudah dibuat oleh kelas "${clashClass.displayName}" (siswa dan Sensei sama), kemungkinan dibuat lewat Jadwal Resmi. Pakai kelas itu, jangan generate dari kelas ini. Generate dibatalkan.`
+                : `Bentrok di ${date} ${startTime}${clashClass ? ` dengan kelas "${clashClass.displayName}"` : ''}. Generate dibatalkan.`,
+              { duration: 20000 }
+            );
             return 0;
           }
           const duplicate = findSameDayDuplicate([...state.schedules, ...created], {
