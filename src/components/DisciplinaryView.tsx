@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { getDisciplinaryMetrics, monthKey } from '../lib/disciplinary';
+import { getDisciplinaryMetrics, monthKey, type DisciplinePeriod } from '../lib/disciplinary';
 import { useDashboardStore, usePermissions } from '../store/useDashboardStore';
 import { PageIntro } from './ui/PageIntro';
 import { StatCard } from './ui/StatCard';
@@ -12,7 +12,12 @@ export function DisciplinaryView() {
   const sensei = useDashboardStore((state) => state.sensei);
   const schedules = useDashboardStore((state) => state.schedules);
   const logs = useDashboardStore((state) => state.sessionLogs);
-  const month = monthKey(new Date());
+  const [mode, setMode] = useState<'month' | 'range'>('month');
+  const [month, setMonth] = useState(monthKey(new Date()));
+  const [range, setRange] = useState({ from: '', to: '' });
+  const rangeInvalid = Boolean(range.from && range.to && range.from > range.to);
+  const period: DisciplinePeriod = mode === 'month' ? month || monthKey(new Date()) : range;
+  const periodLabel = mode === 'month' ? month : `${range.from || 'awal'} s/d ${range.to || 'sekarang'}`;
   const [sortKey, setSortKey] = useState<SortKey>('swaps');
 
   const visible = permissions.canViewAllSensei
@@ -22,7 +27,13 @@ export function DisciplinaryView() {
   const rows = useMemo(() => {
     const mapped = visible.map((item) => ({
       sensei: item,
-      metrics: getDisciplinaryMetrics(item.id, month, schedules, logs)
+      metrics: getDisciplinaryMetrics(
+        item.id,
+        // An inverted range matches nothing instead of silently showing everything.
+        rangeInvalid ? { from: '9999-12-31', to: '0000-01-01' } : period,
+        schedules,
+        logs
+      )
     }));
     const weight = (m: (typeof mapped)[number]['metrics']) =>
       sortKey === 'swaps'
@@ -38,7 +49,7 @@ export function DisciplinaryView() {
           b.metrics.lateJoins -
           (a.metrics.senseiInitiatedSwaps + a.metrics.cancelledNoReplacement + a.metrics.lateJoins)
     );
-  }, [visible, month, schedules, logs, sortKey]);
+  }, [visible, period, rangeInvalid, schedules, logs, sortKey]);
 
   const totals = useMemo(
     () =>
@@ -69,13 +80,66 @@ export function DisciplinaryView() {
 
   return (
     <div className="space-y-6">
-      <PageIntro kicker="Disiplin" title={`Disiplin · ${month}`}>
+      <PageIntro kicker="Disiplin" title={`Disiplin · ${periodLabel}`}>
         Metrik disiplin ditampilkan terpisah, belum digabung ke skor QA. Swap yang diminta siswa/admin tidak
         dihitung ke Sensei. Pembatalan tanpa pengganti hanya dihitung jika initiator Sensei.
       </PageIntro>
 
+      <div className="ui-card flex flex-wrap items-end gap-3 p-3">
+        <label>
+          <span className="ui-label">Periode</span>
+          <select
+            className="ui-select"
+            value={mode}
+            onChange={(event) => setMode(event.target.value as 'month' | 'range')}
+          >
+            <option value="month">Per bulan</option>
+            <option value="range">Rentang tanggal</option>
+          </select>
+        </label>
+        {mode === 'month' ? (
+          <label>
+            <span className="ui-label">Bulan</span>
+            <input
+              className="ui-input"
+              type="month"
+              value={month}
+              onChange={(event) => setMonth(event.target.value)}
+            />
+          </label>
+        ) : (
+          <>
+            <label>
+              <span className="ui-label">Dari tanggal</span>
+              <input
+                className="ui-input"
+                type="date"
+                value={range.from}
+                onChange={(event) => setRange({ ...range, from: event.target.value })}
+              />
+            </label>
+            <label>
+              <span className="ui-label">Sampai tanggal</span>
+              <input
+                className="ui-input"
+                type="date"
+                value={range.to}
+                onChange={(event) => setRange({ ...range, to: event.target.value })}
+              />
+            </label>
+          </>
+        )}
+        {rangeInvalid ? (
+          <p className="text-sm text-danger">Tanggal awal harus sebelum tanggal akhir.</p>
+        ) : null}
+      </div>
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Swap inisiatif Sensei" value={totals.swaps} hint="bulan ini, seluruh Sensei" />
+        <StatCard
+          label="Swap inisiatif Sensei"
+          value={totals.swaps}
+          hint="periode terpilih, seluruh Sensei"
+        />
         <StatCard label="Cancel tanpa pengganti" value={totals.cancels} hint="initiator Sensei" />
         <StatCard label="Late join" value={totals.late} hint="grace default 0 menit" />
       </div>

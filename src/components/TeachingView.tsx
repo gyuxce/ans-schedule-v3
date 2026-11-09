@@ -9,6 +9,7 @@ import {
   formatDurationMinutes,
   scheduledDurationMinutes
 } from '../lib/duration';
+import { normalizeRecordingStatus } from '../lib/recording';
 import { getSessionWorkflow, workflowLabel } from '../lib/session';
 import { formatCountdown, useNow } from '../lib/useNow';
 import { useDashboardStore, usePermissions, useScopedData } from '../store/useDashboardStore';
@@ -681,7 +682,10 @@ function SessionDrawer(props: {
             className="ui-input"
             value={recordingUrl}
             disabled={!props.canInput}
-            onChange={(event) => setRecordingUrl(event.target.value)}
+            onChange={(event) => {
+              setRecordingUrl(event.target.value);
+              setRecordingStatus((current) => normalizeRecordingStatus(event.target.value, current));
+            }}
           />
         </label>
         <label>
