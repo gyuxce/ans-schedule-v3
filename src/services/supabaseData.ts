@@ -33,6 +33,7 @@ import {
   studentToRow
 } from '../lib/mappers';
 import { resolveSenseiId } from '../lib/senseiLink';
+import { sortSenseiByJoinDate } from '../lib/senseiOrder';
 import { getSupabase } from '../lib/supabase';
 import type { AvailabilitySlot, ClassSession, SessionLog, SessionReport, TeachingQaScore } from '../types';
 
@@ -182,8 +183,11 @@ export async function loadDashboardSnapshot(): Promise<DashboardSnapshot | null>
   const statusBySensei = new Map(
     ((statusRes.data || []) as Record<string, unknown>[]).map((row) => [String(row.sensei_id), row])
   );
-  const sensei = ((senseiRes.data || []) as Record<string, unknown>[]).map((row) =>
-    mapSenseiWithStatus(mapSensei(row), statusBySensei.get(String(row.id)))
+  // Every Sensei picker and list reads this array, so the agreed order (newest join first, then A-Z) is set once here.
+  const sensei = sortSenseiByJoinDate(
+    ((senseiRes.data || []) as Record<string, unknown>[]).map((row) =>
+      mapSenseiWithStatus(mapSensei(row), statusBySensei.get(String(row.id)))
+    )
   );
 
   // "Sensei terkait" is never read off this row — it's derived live from the
