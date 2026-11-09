@@ -118,18 +118,37 @@ export function findSameDayDuplicate(
   );
 }
 
-/** Another live (active/ready) class at the same level that shares a student: usually a class entered twice. */
+/** Another live (active/ready) class of the same level (and type, when given) that shares a student. */
 export function findOverlappingClasses(
   classMasters: ClassMaster[],
-  candidate: { id?: string; level: string; studentIds: string[] }
+  candidate: { id?: string; level: string; type?: ClassMaster['type']; studentIds: string[] }
 ) {
   return classMasters.filter(
     (item) =>
       item.id !== candidate.id &&
       (item.status === 'active' || item.status === 'ready') &&
       item.level === candidate.level &&
+      (candidate.type == null || item.type === candidate.type) &&
       item.studentIds.some((id) => candidate.studentIds.includes(id))
   );
+}
+
+/**
+ * Why a new class must not be created: a live class of the same type and level already
+ * holds one of its students. Making a second one only splits the sessions, the progress
+ * and the enrollment between two classes (and the new one cannot be generated, it clashes).
+ */
+export function duplicateClassError(
+  classMasters: ClassMaster[],
+  candidate: { level: string; type: ClassMaster['type']; studentIds: string[] }
+) {
+  const found = findOverlappingClasses(classMasters, candidate);
+  if (!found.length) return null;
+  return `Sudah ada kelas ${candidate.type} ${candidate.level} aktif untuk siswa yang sama: ${found
+    .map((item) => item.displayName)
+    .join(
+      ', '
+    )}. Buka kelas itu dan klik Generate jadwal, jangan buat kelas baru. Kalau memang kelas pengganti, batalkan atau tandai selesai kelas lama dulu.`;
 }
 
 /**
