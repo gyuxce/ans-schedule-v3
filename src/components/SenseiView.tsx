@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { CLASS_LEVELS } from '../constants';
 import { getOperationalLabels, jlptLevels, senseiDisplayName } from '../lib/labels';
+import { compareSenseiByJoinDate } from '../lib/senseiOrder';
 import { timezoneAbbreviation, timezoneLabel, SENSEI_TIMEZONE_OPTIONS } from '../lib/timezone';
 import { formatHours, formatPercent, getWorkloadMetrics } from '../lib/workload';
 import { useDashboardStore, usePermissions } from '../store/useDashboardStore';
@@ -234,7 +235,7 @@ export function SenseiView() {
       const aScore = a.labels.includes('UNASSIGNED') ? 0 : a.labels.includes('NEW') ? 1 : 2;
       const bScore = b.labels.includes('UNASSIGNED') ? 0 : b.labels.includes('NEW') ? 1 : 2;
       if (aScore !== bScore) return aScore - bScore;
-      return senseiDisplayName(a.item).localeCompare(senseiDisplayName(b.item));
+      return compareSenseiByJoinDate(a.item, b.item, senseiDisplayName);
     });
   }, [
     visible,

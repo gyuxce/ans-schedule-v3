@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { buildEomSessionRows, downloadEomExcel, eomRowsToCsv, summarizeEomBySensei } from '../lib/eomReport';
+import { sortSenseiActiveFirst } from '../lib/senseiOrder';
 import { useDashboardStore, usePermissions, useScopedData } from '../store/useDashboardStore';
 import type { ClassStatus } from '../types';
 import { Button } from './ui/Button';
@@ -118,9 +119,10 @@ export function ReportsView() {
               onChange={(event) => setSenseiFilter(event.target.value)}
             >
               <option value="all">Semua Sensei</option>
-              {allSensei.map((item) => (
+              {sortSenseiActiveFirst(allSensei).map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
+                  {item.primaryStatus === 'ACTIVE' ? '' : ' (nonaktif)'}
                 </option>
               ))}
             </select>
@@ -199,8 +201,7 @@ export function ReportsView() {
                         )}
                       </td>
                       <td className="whitespace-nowrap text-xs tabular-nums text-ink-soft">
-                        {row.scheduledMinutes}m
-                        <span className="px-1 text-ink-soft/60">→</span>
+                        {row.scheduledMinutes}m<span className="px-1 text-ink-soft/60">→</span>
                         {row.actualMinutes == null ? '—' : `${row.actualMinutes}m`}
                       </td>
                       <td className="text-ink-soft">{row.sessionLabel}</td>

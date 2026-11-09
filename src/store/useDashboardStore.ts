@@ -24,6 +24,7 @@ import {
 import { timesOverlap, toDateKey } from '../lib/dates';
 import { CLASS_CANCELLED_REASON, classifyRemoteError } from '../lib/remoteError';
 import { normalizeRecordingStatus } from '../lib/recording';
+import { sortSenseiByJoinDate } from '../lib/senseiOrder';
 import { addMinutesToTime, generateRecurringDates, suggestPlannedEndDate } from '../lib/recurring';
 import { previewConflicts, buildRecurringPreview } from '../lib/schedulePreview';
 import {
@@ -1403,9 +1404,10 @@ export const useDashboardStore = create<DashboardStore>()(
             newValue: next
           });
           return {
-            sensei: exists
-              ? current.sensei.map((item) => (item.id === id ? next : item))
-              : [next, ...current.sensei],
+            // Editing the join date moves the Sensei in the list, so re-sort both on add and on edit.
+            sensei: sortSenseiByJoinDate(
+              exists ? current.sensei.map((item) => (item.id === id ? next : item)) : [next, ...current.sensei]
+            ),
             auditLogs: current.auditLogs
           };
         });
