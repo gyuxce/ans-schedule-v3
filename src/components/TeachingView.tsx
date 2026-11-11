@@ -15,6 +15,7 @@ import { formatCountdown, useNow } from '../lib/useNow';
 import { useDashboardStore, usePermissions, useScopedData } from '../store/useDashboardStore';
 import type {
   AttendanceStatus,
+  ClassMaster,
   ClassSession,
   RecordingStatus,
   SessionLog,
@@ -24,6 +25,7 @@ import type {
   StudentSessionRecord
 } from '../types';
 import { Badge } from './ui/Badge';
+import { ExternalLink } from './ui/ExternalLink';
 import { Button } from './ui/Button';
 import { FilterChips } from './ui/FilterChips';
 import { Meter } from './ui/Meter';
@@ -504,6 +506,7 @@ function SessionDrawer(props: {
         {props.log?.lateJoin ? <Badge tone="danger">Late join</Badge> : null}
         {props.log?.overridden ? <Badge tone="gold">Clock override</Badge> : null}
       </div>
+      {teachingClass ? <ClassLinks teachingClass={teachingClass} /> : null}
       {ordinal && ordinal.unreportedBefore > 0 ? (
         <p className="rounded-xl border border-warn/25 bg-warn-soft px-3 py-2 text-sm text-ink">
           {ordinal.unreportedBefore} sesi sebelumnya belum ada laporan, jadi urutan kalender (Sesi{' '}
@@ -779,5 +782,34 @@ function SessionDrawer(props: {
         <p className="text-xs text-ink-soft">Laporan hanya bisa dikirim setelah clock-out.</p>
       ) : null}
     </Modal>
+  );
+}
+
+/**
+ * The class's working links, shown in the session itself so whoever teaches it
+ * (including a substitute Sensei) has them without going to Class Master.
+ */
+function ClassLinks({ teachingClass }: { teachingClass: ClassMaster }) {
+  const links = [
+    { label: 'Progres kelas', value: teachingClass.meetLink },
+    { label: 'Classroom', value: teachingClass.classroomLink },
+    { label: 'Chat', value: teachingClass.chatLink },
+    { label: 'Material', value: teachingClass.materialLink }
+  ];
+  if (links.every((item) => !item.value)) return null;
+  return (
+    <div className="rounded-xl border border-line p-3 text-sm">
+      <p className="ui-label">Link kelas</p>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        {links.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <dt className="text-xs text-ink-soft">{item.label}</dt>
+            <dd className="text-xs">
+              <ExternalLink value={item.value} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }

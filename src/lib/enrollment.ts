@@ -77,7 +77,7 @@ function replacedClassSessions(
       )
       .map((item) => item.id)
   );
-  if (replaced.size === 0) return 0;
+  if (replaced.size === 0) return [];
   return schedules.filter(
     (session) =>
       session.status !== 'cancelled' &&
@@ -85,7 +85,7 @@ function replacedClassSessions(
       session.studentIds.includes(enrollment.studentId) &&
       (!enrollment.startDate || session.date >= enrollment.startDate) &&
       hasRun(session, reports)
-  ).length;
+  );
 }
 
 export function countEnrollmentSessionsCompleted(
@@ -94,11 +94,16 @@ export function countEnrollmentSessionsCompleted(
   reports: SessionReport[],
   classMasters: ClassMaster[] = []
 ) {
-  let computed = schedules.filter(
+  const own = schedules.filter(
     (session) => sessionBelongsToEnrollment(session, enrollment) && hasRun(session, reports)
-  ).length;
-  // Only when the linked class has nothing yet: a class replaced by a new one keeps the sessions already held.
-  if (computed === 0) computed = replacedClassSessions(enrollment, schedules, reports, classMasters);
+  );
+  // Sessions held under a replaced class add to the new class's sessions (the student had both).
+  // A meeting recorded in both classes at the same date and time is still one meeting.
+  const held = new Set(own.map((session) => `${session.date} ${session.startTime}`));
+  for (const session of replacedClassSessions(enrollment, schedules, reports, classMasters)) {
+    held.add(`${session.date} ${session.startTime}`);
+  }
+  const computed = Math.max(own.length, held.size);
   // Prefer the stored value when Ops set it, but never undercount completed reports for the journey.
   if (typeof enrollment.sessionsCompleted === 'number' && enrollment.sessionsCompleted >= 0) {
     return Math.max(enrollment.sessionsCompleted, computed);

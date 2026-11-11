@@ -213,9 +213,20 @@ describe('countEnrollmentSessionsCompleted: class replaced by a new one', () => 
     expect(countEnrollmentSessionsCompleted(linked, sessions, [], classes)).toBe(3);
   });
 
-  it('does not use the fallback when the linked class already has sessions', () => {
-    const own = session('own', { classId: 'new', level: 'Guntai 3', date: '2026-10-30' });
-    expect(countEnrollmentSessionsCompleted(linked, [...sessions, own], [], classes)).toBe(1);
+  it('adds the replaced class sessions to the sessions already held in the new class', () => {
+    // Real case: 3 sessions under the cancelled class, then 1 under the new one = 4, not 1.
+    const own = session('own', { classId: 'new', level: 'Guntai 3', date: '2026-11-08' });
+    expect(countEnrollmentSessionsCompleted(linked, [...sessions, own], [], classes)).toBe(4);
+  });
+
+  it('a meeting recorded in both classes at the same date and time counts once', () => {
+    const same = session('same', { classId: 'new', level: 'Guntai 3', date: '2026-10-24' });
+    expect(countEnrollmentSessionsCompleted(linked, [...sessions, same], [], classes)).toBe(3);
+  });
+
+  it('unreported, not completed sessions of the replaced class do not count', () => {
+    const notRun = held('d', '2026-10-03', { status: 'active' });
+    expect(countEnrollmentSessionsCompleted(linked, [...sessions, notRun], [], classes)).toBe(3);
   });
 
   it('ignores earlier classes that are not cancelled, other levels, other students and older dates', () => {
