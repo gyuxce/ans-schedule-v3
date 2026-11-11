@@ -8,9 +8,9 @@ import {
 } from '../lib/classProgress';
 import { formatDay } from '../lib/dates';
 import { displayName, TYPE_TONE } from '../lib/display';
-import { toExternalHref } from '../lib/externalLink';
 import { generateRecurringDates } from '../lib/recurring';
 import { useDashboardStore, usePermissions, useScopedData } from '../store/useDashboardStore';
+import { ExternalLink } from './ui/ExternalLink';
 import type { ClassMaster, ClassMasterStatus, ClassType } from '../types';
 import { Avatar } from './ui/Avatar';
 import { Badge } from './ui/Badge';
@@ -843,22 +843,5 @@ export function ClassesView() {
         </Modal>
       )}
     </div>
-  );
-}
-
-/** Link field in the class detail: clickable when it is a real link, plain text otherwise. */
-function ExternalLink({ value }: { value: string }) {
-  if (!value) return <>—</>;
-  const href = toExternalHref(value);
-  if (!href) return <>{value}</>;
-  return (
-    <a
-      className="break-all font-semibold text-accent underline"
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {value}
-    </a>
   );
 }
